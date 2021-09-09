@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Bug fixes
 - Cleaned up multiqc report config file to handle automatic sample name generation. 
-  Fixes issue ([#10] (https://github.com/mikewolfe/ChIPseq_pipeline/issues/10))
+  Fixes issue ([#10](https://github.com/mikewolfe/ChIPseq_pipeline/issues/10))
 
 ## 0.2.0 - 2021-09-08
 
