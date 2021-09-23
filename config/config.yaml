@@ -90,6 +90,18 @@ coverage_and_norm:
         # pseudocount is added before normalizing by the median
         pseudocount:
             value: 0
+    bwtools_spike_scale:
+        # This controls how the spike-in regions are used to scale the
+        # data when scaling to a spike-in.
+        # Specify the regions to consider for the spike-in here as a bed.
+        # Below is a placeholder you would want to put in your own bed here
+        fixed_regions:
+            value: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+        # What to do with the values in the spike-in sample? This sums the
+        # coverage to use as a scaling factor. You could also use mean or
+        # median over the regions considered.
+        summary_func:
+            value: "sum"
     bwtools_fixed_subtract:
         # what regions to use as the background when doing a background
         # subtraction. This just uses all genes which is non-sensical.
@@ -168,7 +180,7 @@ postprocessing:
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_fixedsub_fixedscale.bw"
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_spike_ratio_fixedsub_fixedscale.bw"
             # how many bp upstream (5') of a feature to include
             upstream: 0
             # how many bp downstream (3') of a feature to include

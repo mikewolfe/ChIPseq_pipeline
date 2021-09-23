@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Next
+
+### Added
+- Support for spike-in based normalization
+- Ability to specify summary function for all region-based normalizations
+
+### Bug fixes
+- Fixed bug in error reporting for missing parameters in config file
+
 ## 0.2.1 - 2021-09-22
 
 ### Added

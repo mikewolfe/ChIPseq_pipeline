@@ -111,7 +111,7 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
     return arrays
 
-def fixed_subtract(arrays, fixed_regions = None, res = 1):
+def fixed_subtract(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
     import bed_utils
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(fixed_regions)
@@ -119,12 +119,12 @@ def fixed_subtract(arrays, fixed_regions = None, res = 1):
     for region in inbed:
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
-    subtract_val = np.mean(fixed_vals[np.isfinite(fixed_vals)])
+    subtract_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], subtract_val, 1)
     return arrays
 
-def fixed_scale(arrays, fixed_regions = None, res = 1):
+def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
     import bed_utils
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(fixed_regions)
@@ -132,7 +132,7 @@ def fixed_scale(arrays, fixed_regions = None, res = 1):
     for region in inbed:
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
-    scale_val = np.mean(fixed_vals[np.isfinite(fixed_vals)])
+    scale_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
@@ -153,7 +153,7 @@ def get_values_per_region(arrays, query_regions, res =1):
     finite_vals = np.isfinite(region_averages)
     return(region_names[finite_vals], region_averages[finite_vals])
 
-def query_subtract(arrays, res = 1, query_regions = None, number_of_regions = None):
+def query_subtract(arrays, res = 1, query_regions = None, number_of_regions = None, summary_func = np.nanmean):
     region_names, region_averages = get_values_per_region(arrays, query_regions, res)
     region_averages = np.array(region_averages)
     sort_indices = np.argsort(region_averages)
@@ -163,7 +163,7 @@ def query_subtract(arrays, res = 1, query_regions = None, number_of_regions = No
     print("Bottom %s background regions"%number_of_regions)
     for region,val in zip(regions, vals):
         print(region + "\t" + "%s"%val)
-    background_val = np.mean(vals)
+    background_val = summary_func(vals)
     print("Background val: %s"%background_val)
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], background_val, 1)
@@ -180,7 +180,7 @@ def scale_max(arrays, num_top, res = 1):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
 
-def scale_region_max(arrays, number_of_regions, query_regions = None, res =1):
+def scale_region_max(arrays, number_of_regions, query_regions = None, res =1, summary_func = np.nanmean):
     region_names, region_averages = get_values_per_region(arrays, query_regions, res)
     region_averages = np.array(region_averages)
     sort_indices = np.argsort(region_averages)
@@ -190,7 +190,7 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1):
     print("Top %s background regions"%number_of_regions)
     for region,val in zip(regions, vals):
         print(region + "\t" + "%s"%val)
-    scale_factor = np.mean(vals)
+    scale_factor = summary_func(vals)
     print("Max val: %s"%scale_factor)
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
@@ -200,13 +200,18 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1):
 
 def manipulate_main(args):
 
+    summary_func_dict = { "mean": np.nanmean,
+            "median": np.nanmedian,
+            "sum": np.nansum }
+
     operation_dict={"RobustZ": RobustZ_transform, 
             "Median_norm": lambda x: Median_norm(x, args.pseudocount),
-            "fixed_subtract": lambda x: fixed_subtract(x, args.fixed_regions, args.res),
-            "fixed_scale" : lambda x : fixed_scale(x, args.fixed_regions, args.res),
+            "fixed_subtract": lambda x: fixed_subtract(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
+            "fixed_scale" : lambda x : fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "scale_max": lambda x: scale_max(x, 1000, args.res),
-            "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res),
-            "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions)}
+            "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
+            "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
+            "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func])}
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -425,6 +430,10 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--pseudocount', default = 0, type = int,
             help = "Add value to all unmasked regions before normalization. Only\
                     applicable to the median normalization. Default = 0 ")
+    parser_manipulate.add_argument('--summary_func', default = "mean", type = str,
+            help = "For methods that use regions. What summary function do you want to use over \
+                    said regions. Options: mean, median, sum \
+                    Default = mean ")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 

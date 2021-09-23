@@ -52,12 +52,14 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
         else:
             logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
             outval = default
+    elif default:
+        logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
+        outval = default 
     else:
         if err:
             logger.error(err)
         else:
-            logger.err("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
-        raise KeyError
+            logger.error("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
     return outval
             
 
