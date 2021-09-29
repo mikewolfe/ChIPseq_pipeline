@@ -19,6 +19,9 @@ Starting from raw fastq files this pipeline does the following:
   with [`deeptools`](https://deeptools.readthedocs.io/en/latest/) and custom python scripts 
 - peak calling using either [`macs2`](https://github.com/macs3-project/MACS) or a custom python 
   implementation of [`CMARRT`](https://github.com/mikewolfe/CMARRT_python)
+- variant calling against a reference genome on ChIP input samples using
+  [`breseq`](https://barricklab.org/twiki/bin/view/Lab/ToolsBacterialGenomeResequencing)
+
 
 In addition this pipeline uses [`multiqc`](https://multiqc.info/) to compile the 
 following quality control metrics into an interactive html report:
@@ -114,6 +117,7 @@ The pipeline is organized into modules each of which runs a specific task needed
 - [workflow/rules/peak_calling.smk](workflow/rules/peak_calling.smk) includes rules for calling ChIP-seq peaks
 - [workflow/rules/quality_control.smk](workflow/rules/quality_control.smk) includes rules for performing summarizing quality control on the reads themselves and ChIP-seq specific quality control
 - [workflow/rules/postprocessing.smk](workflow/rules/postprocessing.smk) includes rules for getting summaries of ChIP signals over specified regions or locations
+- [workflow/rules/variant_calling.smk](workflow/rules/variant_calling.smk) includes rules for checking for mutations against the reference genome. Typically run on ChIP input samples. Will take awhile to run.
 
 Each of these rules can be run individually using:
 ```

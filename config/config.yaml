@@ -167,6 +167,14 @@ peak_calling:
         macs2_param_string: 
             value: "--broad"
 
+# Options to control variant calling. I.e. running breseq on the input samples
+variant_calling:
+    # Which samples do you want to run variant calling on. Typically
+    # only the input samples as specified by having no sample name in
+    # the "input_sample" column
+    filter: "input_sample.isnull()"
+
+
 # Control for the postprocessing submodule
 postprocessing:
     # summarizes values by region
