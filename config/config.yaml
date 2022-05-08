@@ -254,9 +254,31 @@ peak_calling:
 
         # specify a parameter string used to control macs2
         # -g EFFECTIVE_GENOME_SIZE is
-        # automatically determined.
+        # automatically determined --call-summits is always specified.
         macs2_param_string: 
             column: macs2_params
+
+    macs2_broad_all:
+        peak_caller: "macs2_broad"
+        # filter out the samples you want to run based on metadata
+        filter: 'not input_sample.isnull()'
+        # Macs2 runs directly on the bam files for each sample so
+        # a filesignature does not need to specified.
+
+        # specify a parameter string used to control macs2
+        # -g EFFECTIVE_GENOME_SIZE is
+        # automatically determined --call-summits is always specified.
+        macs2_param_string: 
+            column: macs2_params
+
+# Options to control motif calling
+motif_calling:
+    macs2_all:
+        motif_caller: "streme"
+        filter: 'not input_sample.isnull()'
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        streme_param_string:
+            value: 
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:

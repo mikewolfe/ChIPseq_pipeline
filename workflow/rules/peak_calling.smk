@@ -18,12 +18,18 @@ def determine_peak_calling_files(config, pep):
         err = "Need peak caller specified for peak_caller model %s in config file. I.e. \npeak_calling:\n\t%s:\n\t\tpeak_caller: 'macs2'"%(model,model))
         these_samples = filter_samples(pep, \
         lookup_in_config(config, ["peak_calling", model, "filter"], "not input_sample.isnull()"))
+        if peak_caller == "macs2_broad":
+            for sample in these_samples:
+                outfiles.append("results/peak_calling/%s/macs2/%s_peaks.broadPeak"%(model, sample))
         if peak_caller == "macs2":
             for sample in these_samples:
-                outfiles.append("results/peak_calling/%s/macs2/%s_peaks.xls"%(model, sample))
+                outfiles.append("results/peak_calling/%s/macs2/%s_peaks.narrowPeak"%(model, sample))
         if peak_caller == "cmarrt":
             for sample in these_samples:
                 outfiles.append("results/peak_calling/%s/cmarrt/%s.narrowPeak"%(model,sample))
+        if peak_caller == "macs3":
+            for sample in these_samples:
+                outfiles.append("results/peak_calling/%s/macs3/%s_peaks.xls"%(model, sample))
     return outfiles
 
 rule run_peak_calling:
@@ -72,19 +78,69 @@ rule macs2_call_peaks:
         inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep),
         genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
     output:
-        "results/peak_calling/{model}/macs2/{sample}_peaks.xls"
+        "results/peak_calling/{model}/macs2/{sample}_summits.bed",
+        "results/peak_calling/{model}/macs2/{sample}_peaks.narrowPeak"
     log:
         stdout="results/peak_calling/logs/{model}/macs2/{sample}_macs2.log",
         stderr="results/peak_calling/logs/{model}/macs2/{sample}_macs2.err"
     params:
         macs2_param_string = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["peak_calling", wildcards.model, "macs2_param_string"], wildcards.sample,\
-        "-f BAMPE --broad") 
+        "-f BAMPE ") 
     conda:
         "../envs/peak_calling.yaml"
     shell:
         "macs2 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
         "--outdir results/peak_calling/{wildcards.model}/macs2/ "
+        "--call-summits "
         "{params.macs2_param_string} "
         "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}"
 
+
+rule macs2_broad_call_peaks:
+    input:
+        ext = "results/alignment/bowtie2/{sample}_sorted.bam",
+        inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep),
+        genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
+    output:
+        "results/peak_calling/{model}/macs2/{sample}_peaks.broadPeak"
+    log:
+        stdout="results/peak_calling/logs/{model}/macs2/{sample}_macs2.log",
+        stderr="results/peak_calling/logs/{model}/macs2/{sample}_macs2.err"
+    params:
+        macs2_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["peak_calling", wildcards.model, "macs2_param_string"], wildcards.sample,\
+        "-f BAMPE ") 
+    conda:
+        "../envs/peak_calling.yaml"
+    shell:
+        "macs2 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
+        "--outdir results/peak_calling/{wildcards.model}/macs2/ "
+        "--broad "
+        "{params.macs2_param_string} "
+        "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}"
+
+rule macs3_call_peaks:
+    input:
+        ext = "results/alignment/bowtie2/{sample}_sorted.bam",
+        inp = lambda wildcards: get_macs2_matching_input(wildcards.sample, pep),
+        genome_size= lambda wildcards: determine_effective_genome_size_file(wildcards.sample, config, pep)
+    output:
+        "results/peak_calling/{model}/macs3/{sample}_peaks.xls",
+        "results/peak_calling/{model}/macs3/{sample}_summits.bed",
+        "results/peak_calling/{model}/macs3/{sample}.narrowPeak"
+    log:
+        stdout="results/peak_calling/logs/{model}/macs3/{sample}_macs3.log",
+        stderr="results/peak_calling/logs/{model}/macs3/{sample}_macs3.err"
+    params:
+        macs3_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["peak_calling", wildcards.model, "macs3_param_string"], wildcards.sample,\
+        "-f BAMPE --broad") 
+    conda:
+        "../envs/peak_calling.yaml"
+    shell:
+        "macs3 callpeak -t {input.ext} -c {input.inp} -n {wildcards.sample} "
+        "--outdir results/peak_calling/{wildcards.model}/macs3/ "
+        "--call-summits "
+        "{params.macs3_param_string} "
+        "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}" 
