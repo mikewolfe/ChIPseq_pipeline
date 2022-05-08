@@ -20,10 +20,10 @@ def determine_motif_calling_files(config, pep):
         lookup_in_config(config, ["motif_calling", model, "filter"], "not input_sample.isnull()"))
         if motif_caller == "streme":
             for sample in these_samples:
-                outfiles.append("results/motif_calling/%s/streme/%s/streme.txt"%(model, sample))
+                outfiles.append("results/motif_calling/%s/streme/renamed_output/%s.txt"%(model, sample))
         if motif_caller == "meme":
             for sample in these_samples:
-                outfiles.append("results/motif_calling/%s/meme/%s/meme.txt"%(model,sample))
+                outfiles.append("results/motif_calling/%s/meme/renamed_output/%s.txt"%(model,sample))
     return outfiles
 
 rule run_motif_calling:
@@ -104,6 +104,18 @@ rule streme_call_motifs:
         "> {log.stdout} 2> {log.stderr}"
 
 
+rule rename_streme_output:
+    input:
+        motifs="results/motif_calling/{model}/streme/{sample}/streme.txt",
+        seqs= "results/motif_calling/{model}/streme/{sample}/sequences.tsv"
+    output:
+        outmotifs="results/motif_calling/{model}/streme/renamed_output/{sample}.txt",
+        outseqs="results/motif_calling/{model}/streme/renamed_output/{sample}.tsv"
+
+    threads: 1
+    shell:
+        "cp {input.motifs} {output.outmotifs} && cp {input.seqs} {output.outseqs}"
+
 rule meme_call_motifs:
     input:
         inseqs = "results/motif_calling/{model}/get_peak_seqs/{sample}_peak_seqs.fa",
@@ -127,3 +139,12 @@ rule meme_call_motifs:
         "-bfile {input.bg} "
         "{params.meme_param_string} "
         "> {log.stdout} 2> {log.stderr}"
+
+rule rename_meme_output:
+    input:
+        motifs="results/motif_calling/{model}/meme/{sample}/meme.txt"
+    output:
+        outmotifs="results/motif_calling/{model}/meme/renamed_output/{sample}.txt"
+    threads: 1
+    shell:
+        "cp {input.motifs} {output.outmotifs} "

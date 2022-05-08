@@ -317,7 +317,7 @@ postprocessing:
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
-            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"

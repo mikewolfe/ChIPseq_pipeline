@@ -89,7 +89,7 @@ class BedFile(object):
     def add_entry(self, entry):
         self.data.append(entry)
     def sort(self):
-        self.data.sort(key = lambda a: a['start'])
+        self.data.sort(key = lambda a: (a['chrm'], a['start']))
     def cleanup(self):
         """
         Remove all duplicate entries, entries are mutable therefore not hashable

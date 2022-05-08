@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - Add a motif calling module. Supports both `meme` and `streme` motif callers
+- Combine bed files from each chromosome into one master bed file
+- Create an annotation file that maps unique name to locust tags and gene names
 
 ### Changed
 - Split macs2 broad and macs2 default into their own peak callers. Always call

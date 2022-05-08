@@ -15,6 +15,12 @@ rule run_alignment:
 def get_genome_fastas(config, genome):
     return config["reference"][genome]["fastas"]
 
+def get_genome_annotations(config, genome, ext = "bed"):
+    out = []
+    for key in lookup_in_config(config, ["reference", genome, "genbanks"]).keys():
+       out.append("results/alignment/process_genbank/%s/%s.%s"%(genome, key, ext))
+    return out
+
 def get_bt2_index(sample, pep):
     reference = lookup_sample_metadata(sample, "genome", pep)
     return "results/alignment/bowtie2_index/%s/%s"%(reference,reference)
@@ -94,6 +100,38 @@ rule combine_fastas:
          "results/alignment/combine_fasta/{wildcards.genome}/{wildcards.genome} "
          "{params.masked_regions} "
          "{input} > {log.stdout} 2> {log.stderr}"
+
+rule combine_beds:
+    message: "Generating bed for genome {wildcards.genome}"
+    input:
+        lambda wildcards: get_genome_annotations(config, wildcards.genome, ext = "bed")
+    output:
+        "results/alignment/combine_bed/{genome}/{genome}.bed",
+    log:
+        stdout="results/alignment/logs/combine_bed/{genome}/{genome}.log",
+        stderr="results/alignment/logs/combine_bed/{genome}/{genome}.err"
+    threads: 1
+    conda:
+        "../envs/alignment.yaml"
+    shell:
+         "python3 workflow/scripts/combine_bed.py "
+         "results/alignment/combine_bed/{wildcards.genome}/{wildcards.genome} "
+         "{input} > {log.stdout} 2> {log.stderr}"
+
+rule get_annotation_table:
+    input:
+        lambda wildcards: get_genome_annotations(config, wildcards.genome, ext = "tsv")
+    output:
+        "results/alignment/combine_bed/{genome}/{genome}_annotations.tsv",
+    log:
+        stdout="results/alignment/logs/get_annotation_table/{genome}/{genome}.log",
+        stderr="results/alignment/logs/get_annotation_table/{genome}/{genome}.err"
+    threads: 1
+    run:
+        shell("cat %s > {output}"%(input[0]))
+        if len(input) > 1:
+            for inf in input[1:]:
+                shell("cat %s | tail -n +2 >> {output}"%(inf)) 
     
 rule bowtie2_index:
     input:
