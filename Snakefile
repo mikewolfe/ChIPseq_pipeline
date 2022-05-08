@@ -159,6 +159,7 @@ include: "workflow/rules/quality_control.smk"
 include: "workflow/rules/peak_calling.smk"
 include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
+include: "workflow/rules/motif_calling.smk"
 
 
 

@@ -277,8 +277,21 @@ motif_calling:
         motif_caller: "streme"
         filter: 'not input_sample.isnull()'
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        get_markov_param_string:
+            value: "-dna -m 2"
         streme_param_string:
-            value: 
+            value: "--dna --minw 8 --maxw 30 --nmotifs 2"
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
+
+#    macs2_all_meme:
+#        motif_caller: "meme"
+#        filter: 'not input_sample.isnull()'
+#        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+#        get_markov_param_string:
+#            value: "-dna -m 0"
+#        get_peak_seqs_param_string:
+#            value: "--upstream 30 --downstream 30"
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:

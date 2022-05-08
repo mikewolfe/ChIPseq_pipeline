@@ -32,32 +32,57 @@ rule run_motif_calling:
 
 
 def determine_filesig_input(sample, model, config, pep):
-   file_sig = lookup_in_config(config, ["peak_calling", model, "filesignature"])
+   file_sig = lookup_in_config(config, ["motif_calling", model, "filesignature"])
    return file_sig%(sample)
 
 rule get_peak_seqs:
     input: 
-        lambda wildcards: determine_seq_input(wildcards.sample, wildcards.model, config, pep)
+        bed=lambda wildcards: determine_filesig_input(wildcards.sample, wildcards.model, config, pep),
+        fasta = lambda wildcards: "results/alignment/combine_fasta/%s/%s.fa"%(\
+        lookup_sample_metadata(wildcards.sample, "genome", pep),\
+        lookup_sample_metadata(wildcards.sample, "genome", pep))
+
     output:
         "results/motif_calling/{model}/get_peak_seqs/{sample}_peak_seqs.fa"
     log:
         stdout="results/motif_calling/logs/{model}/get_peak_seqs/{sample}.log",
         stderr="results/motif_calling/logs/{model}/get_peak_seqs/{sample}.err"
     params:
-        streme_param_string = lambda wildcards: lookup_in_config_persample(config,\
-        pep, ["motif_calling", wildcards.model, "get_peak_seq_param_string"], wildcards.sample,\
-        "--min_size 30") 
+        get_peak_seqs_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["motif_calling", wildcards.model, "get_peak_seqs_param_string"], wildcards.sample,\
+        "--min_size 30 ") 
     conda:
         "../envs/motif_calling.yaml"
     shell:
-        "python3 get_seqs.py {input.bed} {input.fasta} "
-        "{params.streme_param_string} "
+        "python3 workflow/scripts/bed_to_fasta.py {input.bed} {input.fasta} {output} "
+        "--meme_header "
+        "{params.get_peak_seqs_param_string} "
         "> {log.stdout} 2> {log.stderr}"
+
+
+rule get_markov:
+    input:
+        infasta = "results/alignment/combine_fasta/{genome}/{genome}.fa"
+    output:
+        "results/motif_calling/{model}/get_markov/{genome}.txt"
+    log:
+        stdout="results/motif_calling/logs/{model}/get_markov/{genome}.log",
+        stderr="results/motif_calling/logs/{model}/get_markov/{genome}.err"
+    conda:
+        "../envs/motif_calling.yaml"
+    params: 
+        meme_param_string = lambda wildcards: lookup_in_config(config,\
+        ["motif_calling", wildcards.model, "get_markov_param_string"],\
+        "-dna -m 0 ") 
+    shell:
+        "fasta-get-markov {input.infasta} {output} > {log.stdout} 2> {log.stderr}"
 
 
 rule streme_call_motifs:
     input:
-        "results/motif_calling/{model}/get_peak_seqs/{sample}.fa"
+        inseqs ="results/motif_calling/{model}/get_peak_seqs/{sample}_peak_seqs.fa",
+        bg = lambda wildcards: "results/motif_calling/{model}/get_markov/%s.txt"%(\
+        lookup_sample_metadata(wildcards.sample, "genome", pep))
     output:
         "results/motif_calling/{model}/streme/{sample}/sequences.tsv",
         "results/motif_calling/{model}/streme/{sample}/streme.txt",
@@ -68,11 +93,37 @@ rule streme_call_motifs:
     params:
         streme_param_string = lambda wildcards: lookup_in_config_persample(config,\
         pep, ["motif_calling", wildcards.model, "streme_param_string"], wildcards.sample,\
-        "--dna --minw 8 --maxw 15") 
+        "--dna --minw 8 --maxw 30") 
     conda:
         "../envs/motif_calling.yaml"
     shell:
-        "streme --p {input.ext} "
-        "--o results/motif_calling/{wildcards.model}/streme/{wildcards.sample}/ "
+        "streme --p {input.inseqs} "
+        "--oc results/motif_calling/{wildcards.model}/streme/{wildcards.sample}/ "
+        "--bfile {input.bg} "
         "{params.streme_param_string} "
+        "> {log.stdout} 2> {log.stderr}"
+
+
+rule meme_call_motifs:
+    input:
+        inseqs = "results/motif_calling/{model}/get_peak_seqs/{sample}_peak_seqs.fa",
+        bg = lambda wildcards: "results/motif_calling/{model}/get_markov/%s.txt"%(\
+        lookup_sample_metadata(wildcards.sample, "genome", pep))
+    output:
+        "results/motif_calling/{model}/meme/{sample}/meme.html",
+        "results/motif_calling/{model}/meme/{sample}/meme.txt"
+    log:
+        stdout="results/motif_calling/logs/{model}/meme/{sample}_meme.log",
+        stderr="results/motif_calling/logs/{model}/meme/{sample}_meme.err"
+    params:
+        meme_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["motif_calling", wildcards.model, "meme_param_string"], wildcards.sample,\
+        "-dna -revcomp -minw 8 -maxw 32 -mod anr -nmotifs 2") 
+    conda:
+        "../envs/motif_calling.yaml"
+    shell:
+        "meme {input.inseqs} "
+        "-oc results/motif_calling/{wildcards.model}/meme/{wildcards.sample}/ "
+        "-bfile {input.bg} "
+        "{params.meme_param_string} "
         "> {log.stdout} 2> {log.stderr}"
