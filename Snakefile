@@ -74,7 +74,7 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
         else:
             logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
             outval = default
-    elif default:
+    elif default is not None:
         logger.info("No value or column specifier found for keys: '%s' in config file. Defaulting to %s"%(", ".join(keys), default))
         outval = default 
     else:
@@ -82,6 +82,7 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
             logger.error(err)
         else:
             logger.error("No value or column specifier found for keys: '%s' in config file. No default"%(", ".join(keys)))
+            raise ValueError
     return outval
             
 

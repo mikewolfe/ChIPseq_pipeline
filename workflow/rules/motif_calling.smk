@@ -20,10 +20,10 @@ def determine_motif_calling_files(config, pep):
         lookup_in_config(config, ["motif_calling", model, "filter"], "not input_sample.isnull()"))
         if motif_caller == "streme":
             for sample in these_samples:
-                outfiles.append("results/motif_calling/%s/streme/renamed_output/%s.txt"%(model, sample))
+                outfiles.append("results/motif_calling/%s/fimo/%s.tsv"%(model, sample))
         if motif_caller == "meme":
             for sample in these_samples:
-                outfiles.append("results/motif_calling/%s/meme/renamed_output/%s.txt"%(model,sample))
+                outfiles.append("results/motif_calling/%s/fimo/%s.tsv"%(model,sample))
     return outfiles
 
 rule run_motif_calling:
@@ -148,3 +148,39 @@ rule rename_meme_output:
     threads: 1
     shell:
         "cp {input.motifs} {output.outmotifs} "
+
+def find_motif_file(sample, model, motif_caller):
+    if motif_caller == "meme":
+        out = "results/motif_calling/%s/meme/renamed_output/%s.txt"%(model, sample)
+    elif motif_caller == "streme":
+        out = "results/motif_calling/%s/streme/renamed_output/%s.txt"%(model, sample)
+    else:
+        raise ValueError("Don't know where motif file is for sample %s from motif caller %s"%(sample, motif_caller))
+    return out
+    
+
+rule fimo_find_motifs:
+    input:
+        motif_file = lambda wildcards: find_motif_file(wildcards.sample, wildcards.model,\
+        lookup_in_config(config, ["motif_calling", wildcards.model, "motif_caller"])),
+        fasta = lambda wildcards: "results/alignment/combine_fasta/%s/%s.fa"%(\
+        lookup_sample_metadata(wildcards.sample, "genome", pep),\
+        lookup_sample_metadata(wildcards.sample, "genome", pep)),
+        bg = lambda wildcards: "results/motif_calling/{model}/get_markov/%s.txt"%(\
+        lookup_sample_metadata(wildcards.sample, "genome", pep))
+    output:
+        "results/motif_calling/{model}/fimo/{sample}.tsv"
+    log:
+        stderr = "results/motif_calling/logs/{model}/fimo/{sample}.err"
+    conda:
+        "../envs/motif_calling.yaml"
+    params:
+        fimo_param_string = lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["motif_calling", wildcards.model, "fimo_param_string"], wildcards.sample,\
+        "")  
+    shell:
+       "fimo --bfile {input.bg} "
+       "--text "
+       "{params.fimo_param_string} "
+       "{input.motif_file} {input.fasta} " 
+       "> {output} 2> {log.stderr}"
