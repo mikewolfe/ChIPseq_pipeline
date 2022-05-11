@@ -257,6 +257,14 @@ peak_calling:
         # automatically determined --call-summits is always specified.
         macs2_param_string: 
             column: macs2_params
+        peak_coverage:
+            cov_filesig: 
+                value: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            peaks_filesig: 
+                value: "results/peak_calling/macs2_all/macs2/%s_peaks.narrowPeak"
+            upstream: 200
+            downstream: 200
+
 
     macs2_broad_all:
         peak_caller: "macs2_broad"

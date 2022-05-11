@@ -36,6 +36,19 @@ rule run_peak_calling:
     input:
         determine_peak_calling_files(config, pep)
 
+def determine_peak_coverage_files(config, pep):
+    outfiles = []
+    for model in lookup_in_config(config, ["peak_calling"], []):
+        if lookup_in_config(config, ["peak_calling", model, "peak_coverage"], ""):
+            these_samples = filter_samples(pep, \
+            lookup_in_config(config, ["peak_calling", model, "filter"], "not input_sample.isnull()"))
+            outfiles.extend(["results/peak_calling/%s/peak_coverage/%s_peak_coverage.tsv.gz"%(model, sample) for sample in these_samples])
+    return outfiles
+
+rule get_peak_coverage:
+    input:
+        determine_peak_coverage_files(config, pep)
+
 
 def determine_cmarrt_input(sample, model, config, pep):
    file_sig = lookup_in_config(config, ["peak_calling", model, "filesignature"], 
@@ -144,3 +157,36 @@ rule macs3_call_peaks:
         "--call-summits "
         "{params.macs3_param_string} "
         "-g $(cat {input.genome_size}) > {log.stdout} 2> {log.stderr}" 
+
+rule peak_coverage:
+    input: 
+        coverage = lambda wildcards: lookup_in_config_persample(config, pep,\
+        ["peak_calling", wildcards.model,"peak_coverage","cov_filesig"],\
+        wildcards.sample, "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")%(wildcards.sample),
+        regions = lambda wildcards: lookup_in_config_persample(config, pep,\
+        ["peak_calling", wildcards.model,"peak_coverage", "peaks_filesig"], wildcards.sample)%(wildcards.sample) 
+    output:
+        outtext="results/peak_calling/{model}/peak_coverage/{sample}_peak_coverage.tsv.gz"
+    log:
+        stdout="results/peak_calling/logs/{model}/peak_coverage/{sample}.log",
+        stderr="results/peak_calling/logs/{model}/peak_coverage/{sample}.err"
+    params:
+        upstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "downstream"], 0),
+        res = RES
+    threads:
+        5
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 workflow/scripts/bwtools.py query "
+        "{output.outtext} "
+        "{input.coverage} "
+        "--res {params.res} "
+        "--regions {input.regions} "
+        "--upstream {params.upstream} "
+        "--downstream {params.downstream} "
+        "--samp_names {wildcards.sample} "
+        "--summarize identity "
+        "--gzip "
+        "> {log.stdout} 2> {log.stderr} "
