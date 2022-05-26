@@ -1,10 +1,10 @@
 sample_name,filenameR1,filenameR2,file_path,input_sample,genotype,genome,bamCoverage_params,macs2_params
-genotypeA_rep1_ext,genotypeA_rep1_ext_R1.fastq.gz,genotypeA_rep1_ext_R2.fastq.gz,source1,genotypeA_rep1_inp,A,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE --broad
-genotypeA_rep2_ext,genotypeA_rep2_ext_R1.fastq.gz,genotypeA_rep2_ext_R2.fastq.gz,source1,genotypeA_rep2_inp,A,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE --broad
+genotypeA_rep1_ext,genotypeA_rep1_ext_R1.fastq.gz,genotypeA_rep1_ext_R2.fastq.gz,source1,genotypeA_rep1_inp,A,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE
+genotypeA_rep2_ext,genotypeA_rep2_ext_R1.fastq.gz,genotypeA_rep2_ext_R2.fastq.gz,source1,genotypeA_rep2_inp,A,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE
 genotypeA_rep1_inp,genotypeA_rep1_inp_R1.fastq.gz,genotypeA_rep1_inp_R2.fastq.gz,source1,,A,U00096.3,--samFlagInclude 67 --extendReads,
 genotypeA_rep2_inp,genotypeA_rep2_inp_R1.fastq.gz,genotypeA_rep2_inp_R2.fastq.gz,source1,,A,U00096.3,--samFlagInclude 67 --extendReads,
-genotypeB_rep1_ext,genotypeB_rep1_ext_R1.fastq.gz,genotypeB_rep1_ext_R2.fastq.gz,source1,genotypeB_rep1_inp,B,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE --broad
-genotypeB_rep2_ext,genotypeB_rep2_ext_R1.fastq.gz,genotypeB_rep2_ext_R2.fastq.gz,source1,genotypeB_rep2_inp,B,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE --broad
+genotypeB_rep1_ext,genotypeB_rep1_ext_R1.fastq.gz,genotypeB_rep1_ext_R2.fastq.gz,source1,genotypeB_rep1_inp,B,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE
+genotypeB_rep2_ext,genotypeB_rep2_ext_R1.fastq.gz,genotypeB_rep2_ext_R2.fastq.gz,source1,genotypeB_rep2_inp,B,U00096.3,--samFlagInclude 67 --extendReads,-f BAMPE
 genotypeB_rep1_inp,genotypeB_rep1_inp_R1.fastq.gz,genotypeB_rep1_inp_R2.fastq.gz,source1,,B,U00096.3,--samFlagInclude 67 --extendReads,
 genotypeB_rep2_inp,genotypeB_rep2_inp_R1.fastq.gz,genotypeB_rep2_inp_R2.fastq.gz,source1,,B,U00096.3,--samFlagInclude 67 --extendReads,
-genotypeA_rep2_ext_se,genotypeA_rep2_ext_R1.fastq.gz,,source1,genotypeA_rep2_inp,A,U00096.3," ",-f BAM --broad
+genotypeA_rep2_ext_se,genotypeA_rep2_ext_R1.fastq.gz,,source1,genotypeA_rep2_inp,A,U00096.3," ",-f BAM

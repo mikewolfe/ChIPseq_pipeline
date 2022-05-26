@@ -225,7 +225,9 @@ quality_control:
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
 
+
 # Options to control peak calling
+# run with run_peak_calling
 peak_calling:
     # Can make different models to try out different peak callers or parameters
     cmarrt_all:
@@ -254,9 +256,61 @@ peak_calling:
 
         # specify a parameter string used to control macs2
         # -g EFFECTIVE_GENOME_SIZE is
-        # automatically determined.
+        # automatically determined --call-summits is always specified.
         macs2_param_string: 
             column: macs2_params
+        peak_coverage:
+            cov_filesig: 
+                value: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            peaks_filesig: 
+                value: "results/peak_calling/macs2_all/macs2/%s_peaks.narrowPeak"
+            upstream: 200
+            downstream: 200
+
+
+    macs2_broad_all:
+        peak_caller: "macs2_broad"
+        # filter out the samples you want to run based on metadata
+        filter: 'not input_sample.isnull()'
+        # Macs2 runs directly on the bam files for each sample so
+        # a filesignature does not need to specified.
+
+        # specify a parameter string used to control macs2
+        # -g EFFECTIVE_GENOME_SIZE is
+        # automatically determined --call-summits is always specified.
+        macs2_param_string: 
+            column: macs2_params
+
+# Options to control motif calling
+# run with run_motif_calling
+motif_calling:
+    # Can make different models to try out different motif callers or params
+    macs2_all:
+        # Which motif caller? Supports meme and streme
+        motif_caller: "streme"
+        # Which samples to run on?
+        filter: 'not input_sample.isnull()'
+        # Which file to run on?
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        # Parameters for the background markov model
+        get_markov_param_string:
+            value: "-dna -m 2"
+        # Parameters for the streme motif caller
+        streme_param_string:
+            value: "--dna --minw 8 --maxw 30 --nmotifs 2"
+        # Parameters controlling how the sequences are pulled from the bed
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
+
+    # Same thing but running a different motif finder
+    macs2_all_meme:
+        motif_caller: "meme"
+        filter: 'not input_sample.isnull()'
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        get_markov_param_string:
+            value: "-dna -m 0"
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:
@@ -282,7 +336,7 @@ postprocessing:
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
-            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
@@ -387,4 +441,3 @@ postprocessing:
             summary_func: "TR"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
-

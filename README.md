@@ -115,6 +115,7 @@ The pipeline is organized into modules each of which runs a specific task needed
 - [workflow/rules/alignment.smk](workflow/rules/alignment.smk) includes rules for aligning samples to their reference genome
 - [workflow/rules/coverage_and_norm.smk](workflow/rules/coverage_and_norm.smk) includes rules for calculating read coverage over the genome and performing within and between sample normalization
 - [workflow/rules/peak_calling.smk](workflow/rules/peak_calling.smk) includes rules for calling ChIP-seq peaks
+- [workflow/rules/motif_calling.smk](workflow/rules/motif_calling.smk) includes rules for calling motifs in ChIP-seq peaks
 - [workflow/rules/quality_control.smk](workflow/rules/quality_control.smk) includes rules for performing summarizing quality control on the reads themselves and ChIP-seq specific quality control
 - [workflow/rules/postprocessing.smk](workflow/rules/postprocessing.smk) includes rules for getting summaries of ChIP signals over specified regions or locations
 - [workflow/rules/variant_calling.smk](workflow/rules/variant_calling.smk) includes rules for checking for mutations against the reference genome. Typically run on ChIP input samples. Will take awhile to run.
@@ -148,7 +149,7 @@ If you run into any issues with the pipeline and would like help please submit i
 # Version history
 
 
-Currently at version 0.2.8
+Currently at version 0.2.9
 
 
 See the [Changelog](CHANGELOG.md) for version history and upcoming
