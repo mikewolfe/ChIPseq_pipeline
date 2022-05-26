@@ -225,7 +225,9 @@ quality_control:
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
 
+
 # Options to control peak calling
+# run with run_peak_calling
 peak_calling:
     # Can make different models to try out different peak callers or parameters
     cmarrt_all:
@@ -280,26 +282,35 @@ peak_calling:
             column: macs2_params
 
 # Options to control motif calling
+# run with run_motif_calling
 motif_calling:
+    # Can make different models to try out different motif callers or params
     macs2_all:
+        # Which motif caller? Supports meme and streme
         motif_caller: "streme"
+        # Which samples to run on?
         filter: 'not input_sample.isnull()'
+        # Which file to run on?
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        # Parameters for the background markov model
         get_markov_param_string:
             value: "-dna -m 2"
+        # Parameters for the streme motif caller
         streme_param_string:
             value: "--dna --minw 8 --maxw 30 --nmotifs 2"
+        # Parameters controlling how the sequences are pulled from the bed
         get_peak_seqs_param_string:
             value: "--upstream 30 --downstream 30"
 
-#    macs2_all_meme:
-#        motif_caller: "meme"
-#        filter: 'not input_sample.isnull()'
-#        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
-#        get_markov_param_string:
-#            value: "-dna -m 0"
-#        get_peak_seqs_param_string:
-#            value: "--upstream 30 --downstream 30"
+    # Same thing but running a different motif finder
+    macs2_all_meme:
+        motif_caller: "meme"
+        filter: 'not input_sample.isnull()'
+        filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
+        get_markov_param_string:
+            value: "-dna -m 0"
+        get_peak_seqs_param_string:
+            value: "--upstream 30 --downstream 30"
 
 # Options to control variant calling. I.e. running breseq on the input samples
 variant_calling:
@@ -430,4 +441,3 @@ postprocessing:
             summary_func: "TR"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
-

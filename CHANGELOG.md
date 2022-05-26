@@ -5,26 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Develop
+## 0.2.9 - 2022-05-26
 
 ### Added
 - Add a motif calling module. Supports both `meme` and `streme` motif callers
 - Added fimo calling with discovered motifs
 - Add ability get coverage around the set of peaks for each sample
 - Combine bed files from each chromosome into one master bed file
-- Create an annotation file that maps unique name to locust tags and gene names
+- Create an annotation file that maps unique name to locus tags and gene names
 
 ### Changed
 - Split macs2 broad and macs2 default into their own peak callers. Always call
   summits when running macs2 without broad specified
 
-## 0.2.8 - 2021-01-20
+## 0.2.8 - 2022-01-20
 
 ### Added
 - Ability to collapse multiple bigwig files into one using summary stats
 - Ability to perform operations between two groups of bigwig files
 
-## 0.2.7 - 2021-01-10
+## 0.2.7 - 2022-01-10
 
 ### Added
 - Added support for single end libraries
