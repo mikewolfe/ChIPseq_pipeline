@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Develop
+
+### Added
+- Fixed traveling ratio which centers the promoter proximal window at the first
+  coordinate of the given region
+
+### Changes
+- Relaxed size restriction on traveling ratios to be twice the window size. Down
+  from 1000 bp
+
+### Bug fixes
+- Calculation of the center coordinate for traveling ratios was fixed
+
 ## 0.2.9 - 2022-05-26
 
 ### Added

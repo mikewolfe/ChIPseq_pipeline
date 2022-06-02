@@ -314,8 +314,13 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
-def traveling_ratio(array, res, wsize, maxsize):
-    return arraytools.traveling_ratio(array, wsize = wsize//res, length_cutoff = maxsize//res)
+def traveling_ratio(array, res, wsize):
+    return arraytools.traveling_ratio(array, wsize = wsize//res)
+
+def traveling_ratio_fixed(array, res, wsize, upstream):
+    if upstream < wsize:
+        raise ValueError("Upstream must be > %s for fixed traveling ratio. Upstream is %s"%(wsize, upstream))
+    return arraytools.traveling_ratio(array, wsize = wsize//res, peak = upstream//res)
 
 def summit_loc(array, res, wsize, upstream):
     loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
@@ -386,7 +391,8 @@ def query_main(args):
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, args.res, 50, 1000),
+            'TR' : lambda array: traveling_ratio(array, args.res, 50),
+            'TR_fixed' : lambda array: traveling_ratio_fixed(array, args.res, 50, args.upstream),
             'summit_loc': lambda array: summit_loc(array, args.res, 50, args.upstream)}
     try:
         summary_func = summary_funcs[args.summary_func]

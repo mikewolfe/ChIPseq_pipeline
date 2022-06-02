@@ -191,22 +191,26 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, length_cutoff = 1000):
-    # shouldn't do this with anything less than 1000 bp
-    if len(array) < length_cutoff:
+def traveling_ratio(array, wsize = 50, peak = None):
+
+    # array needs to be bigger than both windows
+    if len(array) < wsize*4:
         return np.nan
-    peak = relative_summit_loc(array, wsize)
+    # if peak isn't specified then dynamically find it
+    if peak is None:
+        peak = relative_summit_loc(array, wsize)
     # peak should at the very least be in the first half of the region
     if peak >= len(array) / 2:
         return np.nan
     peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
     
     # center should be far enough away that windows don't overlap
-    center = int((len(array) + peak)/2)
-    if center - wsize < peak + wsize:
+    center = int(len(array)/2) + peak
+    if (center - wsize) < (peak + wsize):
         return np.nan
+    print(peak, center)
 
     center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
 
     out = center_avg/peak_avg
-    return out    
+    return out
