@@ -205,10 +205,9 @@ def traveling_ratio(array, wsize = 50, peak = None):
     peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
     
     # center should be far enough away that windows don't overlap
-    center = int(len(array)/2) + peak
+    center = int((len(array)+ peak)/2) 
     if (center - wsize) < (peak + wsize):
         return np.nan
-    print(peak, center)
 
     center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
 

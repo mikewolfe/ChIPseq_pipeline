@@ -31,6 +31,12 @@ def determine_postprocessing_files(config):
         for model in config["postprocessing"]["bwtools_query"]:
             if config["postprocessing"]["bwtools_query"][model].get("calc_spearman", False):
                 outfiles.append("results/postprocessing/bwtools_query/"+model + "_spearman.tsv")
+
+    if lookup_in_config(config, ["postprocessing", "deeptools_readcount"], ""):
+        outfiles.extend(
+        ["results/postprocessing/deeptools_readcount/%s_deeptools_readcount.tsv.gz"%model\
+        for model in config["postprocessing"]["deeptools_readcount"]])
+
     return outfiles
 
 
@@ -47,6 +53,13 @@ def pull_bws_for_deeptools_models(toolname, modelname, config, pep):
     file_sig = lookup_in_config(config, ["postprocessing", toolname, modelname, "filesignature"],\
     "results/coverage_and_norm/bwtools_compare/%s_median_log2ratio.bw")
     files = [file_sig%(sample) for sample in these_samples]
+    return files
+
+def pull_bams_for_deeptools_models(toolname, modelname, config, pep, ending = ".bam"):
+    these_samples = filter_samples(pep, \
+    lookup_in_config(config, ["postprocessing", toolname, modelname, "filter"], "not input_sample.isnull()"))
+    file_sig = "results/alignment/bowtie2/%s_sorted%s"
+    files = [file_sig%(sample, ending) for sample in these_samples]
     return files
 
 def pull_labels_for_deeptools_models(toolname, modelname, config, pep):
@@ -201,3 +214,34 @@ rule spearman_per_gene:
     shell:
         "Rscript workflow/scripts/region_level_spearmans.R {input} {output} > {log.stdout} "
         "2> {log.stderr}"
+
+
+
+rule deeptools_readcount:
+    input:
+        inbams= lambda wildcards: pull_bams_for_deeptools_models("deeptools_readcount",wildcards.model,config, pep, ".bam"),
+        inbams_idx= lambda wildcards: pull_bams_for_deeptools_models("deeptools_readcount",wildcards.model,config, pep, ".bam.bai"),
+        inbed= lambda wildcards: lookup_in_config(config, ["postprocessing", "deeptools_readcount", wildcards.model, "regions"], None)
+    output:
+        outtext="results/postprocessing/deeptools_readcount/{model}_deeptools_readcount.tsv.gz"
+    log:
+        stdout="results/postprocessing/logs/deeptools_readcount/{model}.log",
+        stderr="results/postprocessing/logs/deeptools_readcount/{model}.err"
+    params:
+        labels = lambda wildcards: pull_labels_for_deeptools_models("bwtools_readcount", wildcards.model, config, pep),
+        outfile= "results/postprocessing/deeptools_readcount/{model}_deeptools_readcount.tsv",
+        readcount_params = lambda wildcards: lookup_in_config(config,\
+        ["postprocessing", "deeptools_readcount", wildcards.model, "readcount_params"],\
+        "--extendReads --samFlagInclude 67 ")
+    threads:
+        10
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "multiBamSummary BED-file --BED {input.inbed} "
+        "--bamfiles {input.inbams} --outRawCounts {params.outfile} "
+        "--labels {params.labels} "
+        "--numberOfProcessors {threads} "
+        "{params.readcount_params} " 
+        "> {log.stdout} 2> {log.stderr} && "
+        "gzip {params.outfile} "

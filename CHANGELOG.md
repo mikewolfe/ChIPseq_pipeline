@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Fixed traveling ratio which centers the promoter proximal window at the first
   coordinate of the given region
+- Ability to get raw read counts for a given set of windows and samples
 
 ### Changes
 - Relaxed size restriction on traveling ratios to be twice the window size. Down

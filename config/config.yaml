@@ -465,3 +465,15 @@ postprocessing:
             summary_func: "TR_fixed"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
+
+    # get *read* coverage per region
+    deeptools_readcount:
+        genotypeA_all_genes:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            # only consider the samples that have a genotype A.
+            filter: 'genotype == "A"'
+
+
