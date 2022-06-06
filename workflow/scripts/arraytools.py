@@ -172,7 +172,7 @@ def weighted_center(array, only_finite = True, normalize = False):
     Args:
         array - 1 dimensional numpy array
         only_finite - subset the array to only include finite data points?
-        normalize - divide by 1 to give a relative center?
+        normalize - divide by length to give a relative center?
     """
     if only_finite:
         finite = np.isfinite(array)
@@ -210,6 +210,6 @@ def traveling_ratio(array, wsize = 50, peak = None):
         return np.nan
 
     center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
-
+    print(peak, center, len(array))
     out = center_avg/peak_avg
     return out

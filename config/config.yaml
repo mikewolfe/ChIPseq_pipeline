@@ -463,6 +463,7 @@ postprocessing:
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
             summary_func: "TR_fixed"
+            bwtools_query_params: "--TR_A_center 40 "
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 
