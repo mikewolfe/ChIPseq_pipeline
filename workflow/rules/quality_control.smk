@@ -106,6 +106,41 @@ def qc_groups(config, pep):
     column = determine_grouping_category(config)
     return pep.sample_table[column].unique().tolist()
 
+## spike-in QC
+
+rule frags_per_contig:
+    input:
+        infile = "results/alignment/bowtie2/{sample}_sorted.bam",
+        inidx = "results/alignment/bowtie2/{sample}_sorted.bam.bai"
+    output:
+        "results/quality_control/frags_per_contig/{sample}_frags_per_contig.tsv"
+    threads: 1
+    conda:
+        "../envs/alignment.yaml"
+    log:
+        stderr = "results/quality_control/logs/frags_per_contig/{sample}_frags_per_contig.err"
+    params:
+        samtools_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["quality_control", "frags_per_contig", "samtools_param_string"], wildcards.sample,\
+        "-f 67")
+    shell:
+        "samtools view {params.samtools_param_string} {input.infile} | python3 workflow/scripts/fragments_per_contig.py > "
+        "{output} 2> {log.stderr}"
+
+rule combine_frags_per_contig:
+    input:
+        expand("results/quality_control/frags_per_contig/{sample}_frags_per_contig.tsv", sample = samples(pep))
+    output:
+        "results/quality_control/frags_per_contig/all_samples.tsv"
+    threads: 1
+    conda:
+        "../envs/R.yaml"
+    log:
+        stderr = "results/quality_control/logs/frags_per_contig/all_samples.err",
+        stdout = "results/quality_control/logs/frags_per_contig/all_samples.log"
+    shell:
+        "Rscript workflow/scripts/combine_frags_per_contig.R {input} > {log.stdout} 2> {log.stderr}"
+
 # OVERALL RULE FOR ChIP QC
 
 rule ChIP_QC:

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- Spike-in quality control by reporting fragments per contig per sample
 - Fixed traveling ratio which centers the promoter proximal window at the first
   coordinate of the given region.
 - Ability to specify window sizes to traveling ratio as well as window A center for
