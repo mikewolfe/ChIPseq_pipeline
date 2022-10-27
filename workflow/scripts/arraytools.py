@@ -172,7 +172,7 @@ def weighted_center(array, only_finite = True, normalize = False):
     Args:
         array - 1 dimensional numpy array
         only_finite - subset the array to only include finite data points?
-        normalize - divide by length to give a relative center?
+        normalize - divide by 1 to give a relative center?
     """
     if only_finite:
         finite = np.isfinite(array)
@@ -191,10 +191,9 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, peak = None):
-
-    # array needs to be bigger than both windows
-    if len(array) < wsize*4:
+def traveling_ratio(array, wsize = 50, peak = None, length_cutoff = 1000):
+    # shouldn't do this with anything less than 1000 bp
+    if len(array) < length_cutoff:
         return np.nan
     # if peak isn't specified then dynamically find it
     if peak is None:
@@ -205,11 +204,11 @@ def traveling_ratio(array, wsize = 50, peak = None):
     peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
     
     # center should be far enough away that windows don't overlap
-    center = int((len(array)+ peak)/2) 
-    if (center - wsize) < (peak + wsize):
+    center = int((len(array) + peak)/2)
+    if center - wsize < peak + wsize:
         return np.nan
 
     center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
-    print(peak, center, len(array))
+
     out = center_avg/peak_avg
-    return out
+    return out    

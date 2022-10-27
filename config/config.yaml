@@ -347,6 +347,10 @@ postprocessing:
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file
             res : 5
+            # Specify how you want the coordinates to be reported in. Options
+            # include "relative_start", "relative_end", "relative_center" and
+            # "absolute". Default is "absolute"
+            coord: "relative_end"
             # How do you want to summarize your data? (identity gives every data
             # point in tidy format)
             summarize: "identity"

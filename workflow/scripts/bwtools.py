@@ -107,8 +107,10 @@ def Median_norm(arrays, pseudocount = 0):
     one_array = np.hstack(list(arrays.values()))
     one_array += pseudocount
     median = np.nanmedian(one_array)
+    if median == 0:
+        raise ValueError("Median was zero. Consider adding a pseudocount for median calculation")
     for chrm in arrays.keys():
-        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], -pseudocount, median)
+        arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
 
 def smooth(arrays, wsize, kernel_type, edge, sigma = None):
@@ -170,6 +172,8 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
     scale_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
@@ -212,6 +216,8 @@ def scale_max(arrays, num_top, res = 1):
     one_array = one_array[np.isfinite(one_array)]
     ind = np.argpartition(one_array, -num_top//res)[-num_top//res:]
     scale_factor = np.nanmedian(one_array[ind])
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
 
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
@@ -229,6 +235,8 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1, su
         print(region + "\t" + "%s"%val)
     scale_factor = summary_func(vals)
     print("Max val: %s"%scale_factor)
+    if scale_factor == 0:
+        raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
@@ -274,10 +282,11 @@ def read_multiple_bws(bw_files, res = 1):
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
     return (all_bws, open_fhandles)
 
-def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False):
+def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzip = False, coord = "absolute"):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
     coordinates = []
+    chrm_names = []
     for region in inbed:
         for fname in args.infiles:
             these_arrays = all_bws[fname]
@@ -291,31 +300,52 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
     
             these_values = these_arrays[region["chrm"]][left_coord//res:right_coord//res]
             outvalues[fname].extend(these_values)
-        these_coordinates = list(range((left_coord//res)*res,\
-                (right_coord//res)*res, res))
+        these_coordinates = np.arange((left_coord//res)*res,\
+                (right_coord//res)*res, res)
+        if coord == "relative_start":
+            if region["strand"] == "-":
+                these_coordinates = ((region["end"])//res)*res - these_coordinates - res
+            else:
+                these_coordinates = these_coordinates - (region["start"]//res)*res
+        elif coord == "relative_end":
+            if region["strand"] == "-":
+                these_coordinates = (region["start"]//res)*res - these_coordinates 
+            else:
+                these_coordinates = these_coordinates - ((region["end"])//res)*res + res
+        elif coord == "relative_center":
+            center_coord = (int((region["start"] + region["end"])/ 2)//res)*res
+            if region["strand"] == "-":
+                these_coordinates = center_coord - these_coordinates
+            else:
+                these_coordinates = these_coordinates - center_coord
+        elif coord == "absolute":
+            these_coordinates = these_coordinates
+        else:
+            raise ValueError("Coord must be one of 'relative_start', 'relative_center', 'relative_start', or 'absolute'. Not %s"%(coord))
         coordinates.extend(these_coordinates)
         region_names.extend([region["name"]]*len(these_coordinates))
+        chrm_names.extend([region["chrm"]]*len(these_coordinates))
 
-    header = "region\tcoord\t%s"%("\t".join(samp_names)) + "\n"
+    header = "chrm\tregion\tcoord\t%s"%("\t".join(samp_names)) + "\n"
     values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
     if gzip:
         with gzip.open(args.outfile, mode = "wb") as outf:
             outf.write(header.encode())
-            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
-                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+            for i, (chrm, region, coord) in enumerate(zip(chrm_names, region_names, coordinates)):
+                line = "%s\t%s\t%s\t%s\n"%(chrm, region, coord, values_func(i))
                 outf.write(line.encode())
     else:
         with open(args.outfile, mode = "w") as outf:
             outf.write(header)
-            for i, (region, coord) in enumerate(zip(region_names, coordinates)):
-                line = "%s\t%s\t%s\n"%(region, coord, values_func(i))
+            for i, (chrm, region, coord) in enumerate(zip(chrm_names, region_names, coordinates)):
+                line = "%s\t%s\t%s\t%s\n"%(chrm, region, coord, values_func(i))
                 outf.write(line)
 
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
-def traveling_ratio(array, res, wsize):
-    return arraytools.traveling_ratio(array, wsize = wsize//res)
+def traveling_ratio(array, res, wsize, maxsize):
+    return arraytools.traveling_ratio(array, wsize = wsize//res, length_cutoff = maxsize//res)
 
 def traveling_ratio_fixed(array, res, wsize, relative_location):
     if relative_location < wsize:
@@ -326,9 +356,11 @@ def summit_loc(array, res, wsize, upstream):
     loc = arraytools.relative_summit_loc(array, wsize = wsize//res)
     return loc*res - upstream
 
+
 def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summary_func = np.nanmean, frac_na = 0.25, gzip = False):
     outvalues = {fname: [] for fname in args.infiles}
     region_names = []
+    chrm_names = []
     for region in inbed:
         for fname in args.infiles:
             these_arrays = all_bws[fname]
@@ -351,24 +383,24 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
                 this_summary = np.nan
             outvalues[fname].append(this_summary)
         region_names.append(region["name"])
+        chrm_names.append(region["chrm"])
 
-    header = "region\t%s"%("\t".join(samp_names)) + "\n"
+    header = "chrm\tregion\t%s"%("\t".join(samp_names)) + "\n"
     values_func = lambda i: "\t".join([str(outvalues[samp_to_fname[samp]][i]) for samp in samp_names])
     if gzip:
         with gzip.open(args.outfile, mode = "wb") as outf:
             outf.write(header.encode())
-            for i, region in enumerate(region_names):
-                line = "%s\t%s\n"%(region, values_func(i))
+            for i, (chrm, region) in enumerate(zip(chrm_names, region_names)):
+                line = "%s\t%s\t%s\n"%(chrm, region, values_func(i))
                 outf.write(line.encode())
     else:
 
         with open(args.outfile, mode = "w") as outf:
             outf.write(header)
-            for i, region in enumerate(region_names):
-                line = "%s\t%s\n"%(region, values_func(i))
+            for i, (chrm, region) in enumerate(zip(chrm_names, region_names)):
+                line = "%s\t%s\t%s\n"%(chrm, region, values_func(i))
                 outf.write(line)
 
-        
 def query_main(args):
     import bed_utils
 
@@ -391,16 +423,16 @@ def query_main(args):
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, args.res, args.wsize),
+            'TR' : lambda array: traveling_ratio(array, args.res, 50, 1000),
             'TR_fixed' : lambda array: traveling_ratio_fixed(array, args.res, args.wsize, args.upstream + args.TR_A_center),
-            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream)}
+            'summit_loc': lambda array: summit_loc(array, args.res, 50, args.upstream)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
         KeyError("%s is not a valid option for --summary_func"%(args.summary_func))
 
-    overall_funcs = {'identity' : query_summarize_identity,
-        'single' : lambda x, y, z, a, b, c: query_summarize_single(x, y, z, a,b, summary_func, args.frac_na, c)}
+    overall_funcs = {'identity' : lambda bws, names, smtofn, bed, res, gzip: query_summarize_identity(bws, names, smtofn, bed, res, gzip, args.coords),
+        'single' : lambda bws, names, smtofn, bed, res, gzip: query_summarize_single(bws, names, smtofn, bed,res, summary_func, args.frac_na, gzip)}
     try:
         overall_func = overall_funcs[args.summarize]
     except KeyError:
@@ -410,7 +442,7 @@ def query_main(args):
     
     for fhandle in open_fhandles:
         fhandle.close()
-
+        
 
 def summarize_main(args):
 
@@ -426,31 +458,31 @@ def summarize_main(args):
             the_finite = np.isfinite(this_array)
             outf.write("%s\t%s\n"%(chrm, np.sum(this_array[the_finite])))
 
-def compare_log2ratio(arrays1, arrays2):
+def compare_log2ratio(arrays1, arrays2, pseudocount = 0):
     out_array = {}
     for chrm in arrays1.keys():
-        out_array[chrm] = np.log2(arrays1[chrm]) - np.log2(arrays2[chrm])
+        out_array[chrm] = np.log2(arrays1[chrm] + pseudocount) - np.log2(arrays2[chrm]+pseudocount)
     return out_array
 
-def compare_divide(arrays1, arrays2):
+def compare_divide(arrays1, arrays2, pseudocount = 0):
     out_array = {}
     for chrm in arrays1.keys():
-        out_array[chrm] = arrays1[chrm] / arrays2[chrm]
+        out_array[chrm] = (arrays1[chrm]+pseudocount) / (arrays2[chrm]+pseudocount)
     return out_array
 
-def compare_subtract(arrays1, arrays2):
+def compare_subtract(arrays1, arrays2, pseudocount=0):
     out_array = {}
     for chrm in arrays1.keys():
         out_array[chrm] = arrays1[chrm] - arrays2[chrm]
     return out_array
 
-def compare_add(arrays1, arrays2):
+def compare_add(arrays1, arrays2, pseudocount = 0):
     out_array = {}
     for chrm in arrays1.keys():
         out_array[chrm] = arrays1[chrm] + arrays2[chrm]
     return out_array
 
-def compare_recipratio(arrays1, arrays2):
+def compare_recipratio(arrays1, arrays2, pseudocount = 0):
     out_array = compare_divide(arrays1, arrays2)
     for chrm in arrays1.keys():
         # figure out small values
@@ -476,7 +508,7 @@ def compare_main(args):
     arrays2 = bigwig_to_arrays(inf2, res = args.res)
 
     # perform operation
-    arrays_out = operation_dict[args.operation](arrays1, arrays2)
+    arrays_out = operation_dict[args.operation](arrays1, arrays2, args.pseudocount)
 
 
     # write out file
@@ -624,6 +656,7 @@ if __name__ == "__main__":
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
     parser_query.add_argument('--regions', type=str, help = "regions to grab data from")
+    parser_query.add_argument('--coords', type = str, help = "When running in 'identity' mode do you want 'relative_start', 'relative_center', 'relative_end' or 'absolute' coords? Default = 'absolute'")
     parser_query.add_argument('--upstream', type=int, help = "bp upstream to add")
     parser_query.add_argument('--downstream', type = int, help = "bp downstream to add")
     parser_query.add_argument('--samp_names', type = str, nargs = "+", help = "sample names for each file")
@@ -647,6 +680,9 @@ if __name__ == "__main__":
     parser_compare.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input files")
+    parser_compare.add_argument('--pseudocount', default = 0, type = int,
+            help = "Add value to all unmasked regions before ratio calculations. \
+                    Default = 0 ")
     parser_compare.add_argument('--operation', type=str, default="log2ratio",
             help="Default is log2ratio i.e. log2(infile1) - log2(infile2). Other \
                     options include: add, subtract, divide, recipratio (invert ratios less than 1. Center at 0)")

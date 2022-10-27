@@ -8,6 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- A `run_annotations` rule to pull an annotation table for each genome specified
+  in the config file
+- Ability to get relative coordinates out of postprocessing summaries
 - Spike-in quality control by reporting fragments per contig per sample
 - Fixed traveling ratio which centers the promoter proximal window at the first
   coordinate of the given region.
