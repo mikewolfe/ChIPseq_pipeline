@@ -172,7 +172,7 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         fixed_vals.extend(arrays[region["chrm"]][region["start"]//res:region["end"]//res])
     fixed_vals = np.array(fixed_vals)
     scale_val = summary_func(fixed_vals[np.isfinite(fixed_vals)])
-    if scale_factor == 0:
+    if scale_val == 0:
         raise ValueError("Scale factor value was zero. Consider using different regions")
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
