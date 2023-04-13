@@ -12,11 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the config file
 - Ability to get relative coordinates out of postprocessing summaries
 - Spike-in quality control by reporting fragments per contig per sample
-- Fixed traveling ratio which centers the promoter proximal window at the first
-  coordinate of the given region.
 - Ability to specify window sizes to traveling ratio as well as window A center for
   fixed traveling ratios
 - Ability to get raw read counts for a given set of windows and samples
+
+### Changes
+- Fixed traveling ratio which centers the promoter proximal window at the first
+  coordinate of the given region.
+
+### Bug fixes
+- Fixed multiqc config file to report fastqc results both before and after
+  trimming
 
 ### Changes
 - Relaxed size restriction on traveling ratios to be twice the window size. Down
