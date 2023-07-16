@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Develop
+## 0.3.0 - 2023-07-15
 
 ### Added
 - A `run_annotations` rule to pull an annotation table for each genome specified
@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug fixes
 - Fixed multiqc config file to report fastqc results both before and after
   trimming
+- Fixed issue with quality control where PE fragment size determination failed
+  when sample sheets had both SE and PE samples
 
 ### Changes
 - Relaxed size restriction on traveling ratios to be twice the window size. Down
