@@ -191,11 +191,13 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, length_cutoff = 1000):
+def traveling_ratio(array, wsize = 50, peak = None, length_cutoff = 1000):
     # shouldn't do this with anything less than 1000 bp
     if len(array) < length_cutoff:
         return np.nan
-    peak = relative_summit_loc(array, wsize)
+    # if peak isn't specified then dynamically find it
+    if peak is None:
+        peak = relative_summit_loc(array, wsize)
     # peak should at the very least be in the first half of the region
     if peak >= len(array) / 2:
         return np.nan

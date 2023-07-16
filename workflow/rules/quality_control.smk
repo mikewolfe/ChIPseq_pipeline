@@ -20,6 +20,42 @@ rule run_quality_control:
         "multiqc results/ -o results/quality_control/ --config workflow/envs/multiqc_config.yaml"
 
 
+## spike-in QC
+
+rule frags_per_contig:
+    input:
+        infile = "results/alignment/bowtie2/{sample}_sorted.bam",
+        inidx = "results/alignment/bowtie2/{sample}_sorted.bam.bai"
+    output:
+        "results/quality_control/frags_per_contig/{sample}_frags_per_contig.tsv"
+    threads: 1
+    conda:
+        "../envs/alignment.yaml"
+    log:
+        stderr = "results/quality_control/logs/frags_per_contig/{sample}_frags_per_contig.err"
+    params:
+        samtools_param_string= lambda wildcards: lookup_in_config_persample(config,\
+        pep, ["quality_control", "frags_per_contig", "samtools_param_string"], wildcards.sample,\
+        "-f 67")
+    shell:
+        "samtools view {params.samtools_param_string} {input.infile} | python3 workflow/scripts/fragments_per_contig.py > "
+        "{output} 2> {log.stderr}"
+
+rule combine_frags_per_contig:
+    input:
+        expand("results/quality_control/frags_per_contig/{sample}_frags_per_contig.tsv", sample = samples(pep))
+    output:
+        "results/quality_control/frags_per_contig/all_samples.tsv"
+    threads: 1
+    conda:
+        "../envs/R.yaml"
+    log:
+        stderr = "results/quality_control/logs/frags_per_contig/all_samples.err",
+        stdout = "results/quality_control/logs/frags_per_contig/all_samples.log"
+    shell:
+        "Rscript workflow/scripts/combine_frags_per_contig.R {input} > {log.stdout} 2> {log.stderr}"
+
+
 
 # General read QC
 def fastqc_files_output(pep, type_string = "processed"):
@@ -106,15 +142,17 @@ def qc_groups(config, pep):
     column = determine_grouping_category(config)
     return pep.sample_table[column].unique().tolist()
 
+def get_pe_samples(pep):
+    return filter_samples(pep, "not filenameR2.isnull()")
+
 # OVERALL RULE FOR ChIP QC
 
 rule ChIP_QC:
     input:
         expand("results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint.png", group = qc_groups(config, pep)),
-        #expand("deeptools_QC/{samps}_GCBias_freqs.txt", samps=samples(pep)),
         expand("results/quality_control/deeptools_QC/corHeatmap/{group}_corHeatmap.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/corScatter/{group}_corScatterplot.png", group = qc_groups(config, pep)),
-        expand("results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.png", group = qc_groups(config, pep)),
+        expand("results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/plotCoverage_rmdups/{group}_plotCoverage_rmdups.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/plotCoverage/{group}_plotCoverage.png", group = qc_groups(config, pep)),
         expand("results/quality_control/deeptools_QC/PCA/{group}_plotPCA.png", group = qc_groups(config, pep))
@@ -132,7 +170,10 @@ rule deeptools_QC_fingerprint:
         qualmetrics="results/quality_control/deeptools_QC/fingerprint/{group}_fingerprint_qual_metrics.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)]),
+        binsize = lookup_in_config(config, ["quality_control", "plotFingerprint", "binsize"], 500),
+        num_samps = lookup_in_config(config, ["quality_control", "plotFingerprint", "num_samps"], 9200),
+        bamCoverage_params = lookup_in_config(config, ["quality_control", "bamCoverage_params"], " ")
     conda:
         "../envs/quality_control.yaml"
     threads:
@@ -145,10 +186,10 @@ rule deeptools_QC_fingerprint:
         "plotFingerprint -b {params.bams} --plotFile {output.outplot} "
         "--outRawCounts {output.rawcounts} --outQualityMetrics {output.qualmetrics} "
         "--labels {params.labels} "
-        "--binSize 500 "
-        "--numberOfSamples 9200 --numberOfProcessors {threads} --extendReads "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
+        "--binSize {params.binsize} "
+        "--numberOfSamples {params.num_samps} --numberOfProcessors {threads} "
+        "{params.bamCoverage_params} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule deeptools_QC_multiBamSummary:
     input: 
@@ -158,7 +199,9 @@ rule deeptools_QC_multiBamSummary:
         "results/quality_control/deeptools_QC/{group}_coverage_matrix.npz"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)]),
+        binsize = lookup_in_config(config, ["quality_control", "multiBamSummary", "binsize"], 1000),
+        bamCoverage_params = lookup_in_config(config, ["quality_control", "bamCoverage_params"], "--extendReads --samFlagInclude 67")
     threads:
         10
     log:
@@ -169,10 +212,10 @@ rule deeptools_QC_multiBamSummary:
     shell:
         "multiBamSummary bins -b {params.bams} -o {output} "
         "--labels {params.labels} "
-        "--binSize 1000 "
-        "--numberOfProcessors {threads} --extendReads "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
+        "--binSize {params.binsize} "
+        "--numberOfProcessors {threads} "
+        "{params.bamCoverage_params} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule deeptools_QC_corHeatmap:
     input:
@@ -182,7 +225,7 @@ rule deeptools_QC_corHeatmap:
         cormat="results/quality_control/deeptools_QC/corHeatmap/{group}_corvalues.txt"
     log:
         stdout="results/quality_control/logs/deeptools_QC/corHeatmap/{group}_corHeatmap.log",
-        stderr="results/quality_control/logs/deeptools_QC/corHetamap/{group}_corHeatmap.err"
+        stderr="results/quality_control/logs/deeptools_QC/corHeatmap/{group}_corHeatmap.err"
     conda:
         "../envs/quality_control.yaml"
     shell:
@@ -231,7 +274,9 @@ rule deeptools_QC_plotCoverage:
         counts="results/quality_control/deeptools_QC/plotCoverage/{group}_plotCoverage_count.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)]),
+        num_samps = lookup_in_config(config, ["quality_control", "plotCoverage", "num_samps"], 1000),
+        bamCoverage_params = lookup_in_config(config, ["quality_control", "bamCoverage_params"], " ")
     threads:
         10
     log:
@@ -242,11 +287,11 @@ rule deeptools_QC_plotCoverage:
     shell:
         "plotCoverage -b {params.bams} -o {output.plot} "
         "--labels {params.labels} "
-        "--numberOfProcessors {threads} --extendReads "
-        "--numberOfSamples 1000 "
+        "--numberOfProcessors {threads} "
+        "--numberOfSamples {params.num_samps} "
         "--outRawCounts {output.counts} "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
+        "{params.bamCoverage_params} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule deeptools_QC_plotCoverage_rmdups:
     input: 
@@ -257,7 +302,9 @@ rule deeptools_QC_plotCoverage_rmdups:
         counts="results/quality_control/deeptools_QC/plotCoverage_rmdups/{group}_plotCoverage_count_rmdups.txt"
     params:
         labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)]),
+        num_samps = lookup_in_config(config, ["quality_control", "plotCoverage", "num_samps"], 1000),
+        bamCoverage_params = lookup_in_config(config, ["quality_control", "bamCoverage_params"], " ")
     threads:
         10
     log:
@@ -268,28 +315,29 @@ rule deeptools_QC_plotCoverage_rmdups:
     shell:
         "plotCoverage -b {params.bams} --plotFile {output.plot} "
         "--labels {params.labels} "
-        "--numberOfProcessors {threads} --extendReads --ignoreDuplicates "
-        "--numberOfSamples 1000 "
+        "--numberOfProcessors {threads} --ignoreDuplicates "
+        "--numberOfSamples {params.num_samps} "
         "--outRawCounts {output.counts} "
-        "--minMappingQuality 10 "
-        "--samFlagInclude 66 > {log.stdout} 2> {log.stderr}"
+        "{params.bamCoverage_params} "
+        "> {log.stdout} 2> {log.stderr}"
 
 rule deeptools_QC_bamPEFragmentSize:
     input:
-        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)],
-        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_sample_by_group(wildcards.group, pep)]
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_pe_samples(pep)],
+        lambda wildcards: ["results/alignment/bowtie2/%s_sorted.bam.bai"%samp for samp in get_pe_samples(pep)]
     output:
-        plot="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.png",
-        fragment_hist="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.txt",
-        table="results/quality_control/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize_table.txt"
+        plot="results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.png",
+        fragment_hist="results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.txt",
+        table="results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize_table.txt"
     params:
-        labels = lambda wildcards: " ".join([samp for samp in get_sample_by_group(wildcards.group, pep)]),
-        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_sample_by_group(wildcards.group, pep)])
+        labels = lambda wildcards: " ".join([samp for samp in get_pe_samples(pep)]),
+        bams = lambda wildcards: " ".join(["results/alignment/bowtie2/%s_sorted.bam"%samp for samp in get_pe_samples(pep)]),
+        num_samps = lookup_in_config(config, ["quality_control", "bamPEFragSize", "bin_dist"], 10000),
     threads:
         10
     log:
-        stdout="results/quality_control/logs/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.log",
-        stderr="results/quality_control/logs/deeptools_QC/fragment_sizes/{group}_bamPEFragmentSize.err"
+        stdout="results/quality_control/logs/deeptools_QC/fragment_sizes/bamPEFragmentSize.log",
+        stderr="results/quality_control/logs/deeptools_QC/fragment_sizes/bamPEFragmentSize.err"
     conda:
         "../envs/quality_control.yaml"
     shell:
@@ -298,28 +346,3 @@ rule deeptools_QC_bamPEFragmentSize:
         "--numberOfProcessors {threads} "
         "--distanceBetweenBins 10000 "
         "--table {output.table} --outRawFragmentLengths {output.fragment_hist}  > {log.stdout} 2> {log.stderr}"
-
-# WORK IN PROGRESS
-rule deeptools_QC_computeGCBias:
-    input: 
-        "results/bowtie2/{sample}_sorted.bam"
-    output:
-        gcfile="results/quality_control/deeptools_QC/GCbias/{sample}_GCBias_freqs.txt",
-        gcplot="results/quality_control/deeptools_QC/GCbias/{sample}_GCBias_plot.png"
-    threads:
-        5
-    log:
-        stdout="results/quality_control/logs/deeptools_QC/{sample}_GCBias.log",
-        stderr="results/quality_control/logs/deeptools_QC/{sample}_GCBias.err"
-    params:
-        genome_size = lambda wildcards: determine_genome_size(sample, config, pep)
-    conda:
-        "../envs/quality_control.yaml"
-    shell:
-        "computeGCBias -b {input} --effectiveGenomeSize {params.genome_size} "
-        "-g /mnt/scratch/mbwolfe/genomes/U00096_3.2bit "
-        "--sampleSize 50000 "
-        "--numberOfProcessors {threads} "
-        "--GCbiasFrequenciesFile {output.gcfile}  > {log.stdout} 2> {log.stderr}"
-
-

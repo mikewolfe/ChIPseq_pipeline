@@ -5,7 +5,7 @@ suppressMessages(library(tidyverse))
 # regions
 
 spearman_per_region <- function(d){
-    samples <- colnames(d %>% select(-c(region,coord)))
+    samples <- colnames(d %>% select(-c(region,coord, chrm)))
     out <- list()
     k <- 1
     # do every combination of samples only once

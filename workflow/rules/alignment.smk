@@ -12,6 +12,11 @@ rule run_alignment:
     input:
         expand("results/alignment/bowtie2/{sample}_sorted.bam.bai", sample = samples(pep))
 
+rule run_annotations:
+    input:
+        expand("results/alignment/combine_bed/{genome}/{genome}.bed", genome = config["reference"].keys()),
+        expand("results/alignment/combine_bed/{genome}/{genome}_annotations.tsv", genome = config["reference"].keys())
+
 def get_genome_fastas(config, genome):
     return config["reference"][genome]["fastas"]
 

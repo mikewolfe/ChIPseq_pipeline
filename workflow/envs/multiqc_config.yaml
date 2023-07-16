@@ -5,15 +5,15 @@ module_order:
         info: 'FastQC results after adapter trimming.'
         target: ''
         path_filters:
-            - '*trim*fastqc.zip'
+            - '*/fastqc_processed/*fastqc.zip'
     - trimmomatic
     - cutadapt
     - fastqc:
         name: 'FastQC (raw)'
         info: "FastQC results on the raw files (filenames may differ)"
         anchor: 'fastqc_raw'
-        path_filters_exclude:
-            - '*trim*fastqc.zip'
+        path_filters:
+            - '*/fastqc_raw/*fastqc.zip'
 
 report_section_order:
     fastq_trimmed:
