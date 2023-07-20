@@ -586,6 +586,99 @@ def multicompare_main(args):
             res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     close_multiple_bigwigs(groupA_handles)
 
+def single_num_summary(arrays, function):
+        out_array = np.zeros(np.sum([arrays[chrm].size for chrm in arrays.keys()]), float)
+        i = 0
+        for chrm in arrays.keys():
+            arrsize = arrays[chrm].size
+            out_array[i:i+arrsize] = arrays[chrm][:]
+            i = i + arrsize
+        return function(out_array)
+
+def geometric_mean(arrays, axis = 0, pseudocount = 1.0):
+    arrays = [np.log(array + pseudocount) for array in arrays]
+    return np.exp(np.nanmean(arrays, axis=axis))
+
+def add_pseudocount(array, pseudocount):
+    out_array = {}
+    for chrm in array.keys():
+        out_array[chrm] = array[chrm] + pseudocount
+    return out_array
+
+def scale_array(array, scale_factor, pseudocount):
+    out_array = {}
+    for chrm in array.keys():
+        out_array[chrm] = (array[chrm] + pseudocount)/scale_factor
+    return out_array
+
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs):
+
+    # concatenate all locations where enrichment is not expected into a single array
+
+    # predict extracted using input
+
+    # get sum of residuals and return
+    print(ext_array)
+    print(input_array)
+    print(spike_contigs)
+    print(expected_locs)
+
+def normfactor_main(args):
+    import pandas as pd 
+
+    frag_table = pd.read_csv(args.fragCountTable, sep = "\t")
+    md = pd.read_csv(args.metaDataTable)
+    print(frag_table)
+
+    # get the total number of frags per each sample
+    total_frags = frag_table.assign(total_frag = \
+            lambda x: x.groupby(["sample_name"])['fragments']\
+            .transform(lambda x: x.sum()))\
+    .drop(["contig","fragments"], axis=1)\
+    .drop_duplicates()
+    #total_frags = total_frags[total_frags["sample_name"].isin(args.samples)]
+
+    # spike fragments
+    spike_frags = frag_table[frag_table["contig"].isin(args.spikecontigs)].assign(spike_frag = \
+            lambda x: x.groupby(["sample_name"])['fragments']\
+            .transform(lambda x: x.sum()))\
+    .drop(["contig","fragments"], axis=1)\
+    .drop_duplicates()
+   # spike_frags = spike_frags[spike_frags["sample_name"].isin(args.samples)]
+
+    overall = total_frags.merge(spike_frags, on='sample_name', how = 'left')
+    overall = overall.assign(nonspike_frag = overall['total_frag'] - overall['spike_frag'])
+
+    # DEseq2 size factors
+    bw_handles = open_multiple_bigwigs(args.ext_bws)
+    bw_arrays = convert_bigwigs_to_arrays(bw_handles, res = args.res)
+    geom_means = multicompare_within_group(bw_arrays, lambda x, axis: geometric_mean(x, axis, pseudocount = args.pseudocount))
+    deseq2_sfs = []
+    for array, sample in zip(bw_arrays, args.samples):
+        deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian))
+    deseq2_column = pd.DataFrame(data = {'deseq2_sfs': deseq2_sfs, 'sample_name': args.samples})
+    overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+    print(overall)
+
+    # enrichment based
+    inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
+    inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
+    for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
+        get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
+                scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+                args.spikecontigs,
+                args.expected_regions)
+
+
+    close_multiple_bigwigs(bw_handles)
+    close_multiple_bigwigs(inp_bw_handles)
+
+
+ 
+
+
+        
+
  
 if __name__ == "__main__":
     import argparse
@@ -706,6 +799,27 @@ if __name__ == "__main__":
     parser_multicompare.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
     parser_multicompare.set_defaults(func=multicompare_main)
+
+    # normfactor verb
+    parser_normfactor = subparsers.add_parser("normfactor", help = "Calculate normalization factors based on spike-ins or internal controls")
+    parser_normfactor.add_argument("outfile", type=str, help = "file to output to")
+    parser_normfactor.add_argument("fragCountTable", type = str, help = "table of fragment counts per contig for each sample")
+    parser_normfactor.add_argument("metaDataTable", type = str, help = "table of sample relationships")
+    parser_normfactor.add_argument("--ext_bws", type=str, nargs ="+", help = "extracted raw counts per region")
+    parser_normfactor.add_argument("--inp_bws", type=str, nargs ="+", help = "input raw counts per region")
+    parser_normfactor.add_argument("--samples", type=str, nargs ="+", help = "sample names to determine size factors for. Should match extracted bws")
+    parser_normfactor.add_argument("--spikecontigs", type=str, nargs ="+", help = "sample names to determine size factors for. Should match extracted bws")
+    parser_normfactor.add_argument('--pseudocount', default = 1, type = float,
+            help = "Add value to all unmasked regions before ratio calculations. \
+                    Default = 1 ")
+    parser_normfactor.add_argument('--expected_regions', type = str, help = "bed file of regions where signal is expected")
+    parser_normfactor.add_argument('--res', type=int, default=1,
+            help="Resolution to compute statistics at. Default 1bp. Note this \
+            should be set no lower than the resolution of the input file")
+    parser_normfactor.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output bigwig")
+    parser_normfactor.set_defaults(func=normfactor_main)
+
     
     args = parser.parse_args()
     args.func(args) 

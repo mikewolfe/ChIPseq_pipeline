@@ -11,7 +11,8 @@ rule clean_quality_control:
 rule run_quality_control:
     input:
         "results/quality_control/read_qc.done",
-        "results/quality_control/ChIP_qc.done"
+        "results/quality_control/ChIP_qc.done",
+        "results/quality_control/frags_per_contig/all_samples.tsv"
     output:
         "results/quality_control/multiqc_report.html"
     conda:
