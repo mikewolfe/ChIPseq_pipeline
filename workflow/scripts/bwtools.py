@@ -586,14 +586,16 @@ def multicompare_main(args):
             res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     close_multiple_bigwigs(groupA_handles)
 
-def single_num_summary(arrays, function):
-        out_array = np.zeros(np.sum([arrays[chrm].size for chrm in arrays.keys()]), float)
-        i = 0
-        for chrm in arrays.keys():
-            arrsize = arrays[chrm].size
-            out_array[i:i+arrsize] = arrays[chrm][:]
-            i = i + arrsize
-        return function(out_array)
+def single_num_summary(arrays, function, contigs = None):
+    if contigs is None:
+        contigs = arrays.keys()
+    out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
+    i = 0
+    for chrm in contigs:
+        arrsize = arrays[chrm].size
+        out_array[i:i+arrsize] = arrays[chrm][:]
+        i = i + arrsize
+    return function(out_array)
 
 def geometric_mean(arrays, axis = 0, pseudocount = 1.0):
     arrays = [np.log(array + pseudocount) for array in arrays]
@@ -611,17 +613,58 @@ def scale_array(array, scale_factor, pseudocount):
         out_array[chrm] = (array[chrm] + pseudocount)/scale_factor
     return out_array
 
-def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs):
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res):
+    import bed_utils
+    from sklearn.linear_model import LinearRegression
+    inbed = bed_utils.BedFile()
+    inbed.from_bed_file(expected_locs)
+    print([len(ext_array[contig]) for contig in ext_array])
+    mask_array = {}
+    for contig in spike_contigs:
+        mask_array[contig] = np.ones(len(ext_array[contig]), bool)
+    for region in inbed:
+        if region["chrm"] in spike_contigs:
+            mask_array[region["chrm"]][region["start"]//res:region["end"]//res] = 0
+    
 
     # concatenate all locations where enrichment is not expected into a single array
+    X = []
+    y = []
+    for contig in spike_contigs:
+        y.append(ext_array[contig][mask_array[contig]])
+        X.append(input_array[contig][mask_array[contig]])
+
+    y = np.concatenate(y)
+    X = np.concatenate(X)
+
+    # fit input vs. extracted
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(X), np.isfinite(y))
+    y = y[remove_nansandinfs].reshape(-1,1)
+    X = X[remove_nansandinfs].reshape(-1,1)
+    reg = LinearRegression(fit_intercept = False).fit(X,y)
+    regress_slope = reg.coef_[0,0]
+
+    full_X = []
+    full_y = []
+    for contig in spike_contigs:
+        full_y.append(ext_array[contig][~mask_array[contig]])
+        full_X.append(input_array[contig][~mask_array[contig]])
+
+    full_y = np.concatenate(full_y)
+    full_X = np.concatenate(full_X)
 
     # predict extracted using input
+    # make sure there are no NaNs from masked areas
+    remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
+    resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
+    
 
     # get sum of residuals and return
-    print(ext_array)
-    print(input_array)
-    print(spike_contigs)
-    print(expected_locs)
+    resids[resids < 0] = 0
+    return np.mean(resids)
+
+
 
 def normfactor_main(args):
     import pandas as pd 
@@ -631,23 +674,24 @@ def normfactor_main(args):
     print(frag_table)
 
     # get the total number of frags per each sample
-    total_frags = frag_table.assign(total_frag = \
+    overall = frag_table.assign(total_frag = \
             lambda x: x.groupby(["sample_name"])['fragments']\
             .transform(lambda x: x.sum()))\
     .drop(["contig","fragments"], axis=1)\
     .drop_duplicates()
-    #total_frags = total_frags[total_frags["sample_name"].isin(args.samples)]
+    #total_frags = total_frags[total_frags["sample_name"].isin(args.samples)] 
 
-    # spike fragments
-    spike_frags = frag_table[frag_table["contig"].isin(args.spikecontigs)].assign(spike_frag = \
-            lambda x: x.groupby(["sample_name"])['fragments']\
-            .transform(lambda x: x.sum()))\
-    .drop(["contig","fragments"], axis=1)\
-    .drop_duplicates()
-   # spike_frags = spike_frags[spike_frags["sample_name"].isin(args.samples)]
-
-    overall = total_frags.merge(spike_frags, on='sample_name', how = 'left')
-    overall = overall.assign(nonspike_frag = overall['total_frag'] - overall['spike_frag'])
+    if args.spikecontigs is not None:
+        # spike fragments
+        spike_frags = frag_table[frag_table["contig"].isin(args.spikecontigs)].assign(spike_frag = \
+                lambda x: x.groupby(["sample_name"])['fragments']\
+                .transform(lambda x: x.sum()))\
+        .drop(["contig","fragments"], axis=1)\
+        .drop_duplicates()
+       # spike_frags = spike_frags[spike_frags["sample_name"].isin(args.samples)]
+    
+        overall = overall.merge(spike_frags, on='sample_name', how = 'left')
+        overall = overall.assign(nonspike_frag = overall['total_frag'] - overall['spike_frag'])
 
     # DEseq2 size factors
     bw_handles = open_multiple_bigwigs(args.ext_bws)
@@ -658,18 +702,35 @@ def normfactor_main(args):
         deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian))
     deseq2_column = pd.DataFrame(data = {'deseq2_sfs': deseq2_sfs, 'sample_name': args.samples})
     overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
-    print(overall)
+
+    # DEseq2 size factors spike-in only
+    if args.spikecontigs is not None:
+        deseq2_sfs = []
+        for array, sample in zip(bw_arrays, args.samples):
+            deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, contigs = args.spikecontigs))
+        deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
+        overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
+
 
     # enrichment based
-    inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
-    inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
-    for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
-        get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
-                scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
-                args.spikecontigs,
-                args.expected_regions)
-
-
+    if args.spikecontigs is not None:
+        inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
+        inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
+        regress_resids = []
+        for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
+            regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
+                    scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+                    args.spikecontigs,
+                    args.expected_regions,
+                    args.res))
+        regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
+        regress_sfs = pd.DataFrame(data = {'regress_sfs': np.mean(regress_resids)/regress_resids, 'sample_name': args.samples})
+        overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
+        overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
+        #overall = overall.assign(regress_sf = 
+    print(overall)
+    
+    
     close_multiple_bigwigs(bw_handles)
     close_multiple_bigwigs(inp_bw_handles)
 
