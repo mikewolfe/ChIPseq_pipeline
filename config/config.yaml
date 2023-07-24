@@ -95,6 +95,29 @@ coverage_and_norm:
     dropNaNsandInfs: true
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
+    
+    # revamped spike-in normalization using a model-based approach
+
+    # summarizes values by region
+    spike_norm:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_samples:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull()'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            methods: ["regress", "deseq2", "deseq2_spike", "spike_frag", "spike_enrich"]
+
+
     # Which samples should be smoothed? Smoothing currently only supported for
     # spike-in and median normalization. This smooths everything.
     # If only want inputs smoothed ('input_sample.isnull()').
@@ -224,6 +247,10 @@ coverage_and_norm:
 quality_control:
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
+    frags_per_contig:
+        samtools_param_string:
+            column: "samtools_params"
+
 
 
 # Options to control peak calling

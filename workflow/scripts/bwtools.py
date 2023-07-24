@@ -178,6 +178,14 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
 
+def scale_byfactor(arrays, scale_val, res = 1):
+    if scale_val == 0 or scale_val is None:
+        raise ValueError("Scale factor value was zero or undefined.")
+    for chrm in arrays.keys():
+        arrays[chrm] = arrays[chrm]*scale_val
+    return arrays
+
+
 def get_values_per_region(arrays, query_regions, res =1):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -259,7 +267,8 @@ def manipulate_main(args):
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
-            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge)}
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
+            "scale_byfactor": lambda x: scale_byfactor(x, args.scale_val, args.res) }
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -618,7 +627,6 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     from sklearn.linear_model import LinearRegression
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(expected_locs)
-    print([len(ext_array[contig]) for contig in ext_array])
     mask_array = {}
     for contig in spike_contigs:
         mask_array[contig] = np.ones(len(ext_array[contig]), bool)
@@ -644,7 +652,8 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     X = X[remove_nansandinfs].reshape(-1,1)
     reg = LinearRegression(fit_intercept = False).fit(X,y)
     regress_slope = reg.coef_[0,0]
-
+    
+    # predict expected bound regions using input 
     full_X = []
     full_y = []
     for contig in spike_contigs:
@@ -654,13 +663,13 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     full_y = np.concatenate(full_y)
     full_X = np.concatenate(full_X)
 
-    # predict extracted using input
     # make sure there are no NaNs from masked areas
     remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
+    # get residuals
     resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
     
 
-    # get sum of residuals and return
+    # get sum of positive residuals and return
     resids[resids < 0] = 0
     return np.mean(resids)
 
@@ -671,7 +680,6 @@ def normfactor_main(args):
 
     frag_table = pd.read_csv(args.fragCountTable, sep = "\t")
     md = pd.read_csv(args.metaDataTable)
-    print(frag_table)
 
     # get the total number of frags per each sample
     overall = frag_table.assign(total_frag = \
@@ -679,7 +687,9 @@ def normfactor_main(args):
             .transform(lambda x: x.sum()))\
     .drop(["contig","fragments"], axis=1)\
     .drop_duplicates()
-    #total_frags = total_frags[total_frags["sample_name"].isin(args.samples)] 
+    total_frag_sf_column = pd.DataFrame(data = {'total_frag_sfs': overall["total_frag"]/np.mean(overall["total_frag"]), 'sample_name': overall["sample_name"]})
+    overall = overall.merge(total_frag_sf_column, on = 'sample_name', how = 'left')
+
 
     if args.spikecontigs is not None:
         # spike fragments
@@ -688,10 +698,16 @@ def normfactor_main(args):
                 .transform(lambda x: x.sum()))\
         .drop(["contig","fragments"], axis=1)\
         .drop_duplicates()
-       # spike_frags = spike_frags[spike_frags["sample_name"].isin(args.samples)]
     
         overall = overall.merge(spike_frags, on='sample_name', how = 'left')
         overall = overall.assign(nonspike_frag = overall['total_frag'] - overall['spike_frag'])
+
+        spike_frag_sf_column = pd.DataFrame(data = {'spike_frag_sfs': overall["spike_frag"]/np.mean(overall["spike_frag"]), 'sample_name': overall["sample_name"]})
+        nonspike_frag_sf_column = pd.DataFrame(data = {'nonspike_frag_sfs': overall["nonspike_frag"]/np.mean(overall["nonspike_frag"]), 'sample_name': overall["sample_name"]})
+
+        overall = overall.merge(spike_frag_sf_column, on = 'sample_name', how = 'left')
+        overall = overall.merge(nonspike_frag_sf_column, on = 'sample_name', how = 'left')
+
 
     # DEseq2 size factors
     bw_handles = open_multiple_bigwigs(args.ext_bws)
@@ -712,34 +728,33 @@ def normfactor_main(args):
         overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
 
 
+
     # enrichment based
     if args.spikecontigs is not None:
         inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
         inp_bw_arrays = convert_bigwigs_to_arrays(inp_bw_handles, res = args.res)
         regress_resids = []
+        regress_rpm = []
         for ext_array, inp_array, sample in zip(bw_arrays, inp_bw_arrays, args.samples):
-            regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
-                    scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
+            regress_resids.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0], args.pseudocount),\
+                    scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag_sfs"].values[0], args.pseudocount),\
                     args.spikecontigs,
                     args.expected_regions,
                     args.res))
+            regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
         regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
-        regress_sfs = pd.DataFrame(data = {'regress_sfs': np.mean(regress_resids)/regress_resids, 'sample_name': args.samples})
+        regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
+        regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': regress_resids/np.mean(regress_resids)*regress_rpm, 'sample_name': args.samples})
+
         overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
         overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
-        #overall = overall.assign(regress_sf = 
-    print(overall)
+        overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+
+    overall.to_csv(args.outfile, index = False, sep = "\t", float_format='%.4f')
     
     
     close_multiple_bigwigs(bw_handles)
     close_multiple_bigwigs(inp_bw_handles)
-
-
- 
-
-
-        
-
  
 if __name__ == "__main__":
     import argparse
@@ -758,7 +773,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth' 'scale_byfactor'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -788,6 +803,8 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
+    parser_manipulate.add_argument('--scale_val', type = float, default = 1,
+            help = "A factor for simple scaling. Default = 1")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 
