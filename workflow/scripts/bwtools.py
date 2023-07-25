@@ -178,14 +178,6 @@ def fixed_scale(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_val)
     return arrays
 
-def scale_byfactor(arrays, scale_val, res = 1):
-    if scale_val == 0 or scale_val is None:
-        raise ValueError("Scale factor value was zero or undefined.")
-    for chrm in arrays.keys():
-        arrays[chrm] = arrays[chrm]*scale_val
-    return arrays
-
-
 def get_values_per_region(arrays, query_regions, res =1):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -268,7 +260,7 @@ def manipulate_main(args):
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
-            "scale_byfactor": lambda x: scale_byfactor(x, args.scale_val, args.res) }
+            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount) }
 
     # read in file 
     inf = pyBigWig.open(args.infile)
@@ -617,10 +609,19 @@ def add_pseudocount(array, pseudocount):
     return out_array
 
 def scale_array(array, scale_factor, pseudocount):
+    if scale_factor == 0 or scale_factor is None:
+        raise ValueError("Scale factor value was zero or undefined.")
     out_array = {}
     for chrm in array.keys():
         out_array[chrm] = (array[chrm] + pseudocount)/scale_factor
     return out_array
+
+def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
+    import pandas as pd
+
+    sf_table = pd.read_csv(scalefactor_table, sep = "\t")
+    scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
+    return scale_array(array, scale_factor, pseudocount)
 
 def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res):
     import bed_utils
@@ -782,9 +783,9 @@ if __name__ == "__main__":
             help = "number of regions to include in background or max")
     parser_manipulate.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
-    parser_manipulate.add_argument('--pseudocount', default = 0, type = int,
+    parser_manipulate.add_argument('--pseudocount', default = 0, type = float,
             help = "Add value to all unmasked regions before normalization. Only\
-                    applicable to the median normalization. Default = 0 ")
+                    applicable to the median and scale_byfactor normalization. Default = 0 ")
     parser_manipulate.add_argument('--summary_func', default = "mean", type = str,
             help = "For methods that use regions. What summary function do you want to use over \
                     said regions. Options: mean, median, sum \
@@ -803,8 +804,10 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
-    parser_manipulate.add_argument('--scale_val', type = float, default = 1,
-            help = "A factor for simple scaling. Default = 1")
+    parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
+            help = "A table of scale factors for scale_byfactor")
+    parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,
+            help = "The sample and scale factor to choose from the table")
     parser_manipulate.set_defaults(func=manipulate_main)
 
 

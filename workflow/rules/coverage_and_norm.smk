@@ -21,21 +21,20 @@ rule run_coverage_and_norm:
         ending = ENDING)
 
 
-def determine_spike_norm_files(config):
+def determine_spike_norm_files(config, pep):
     outfiles = []
-
-
-    if lookup_in_config(config, ["coverage_and_norm", "spike_norm"], ""):
-        outfiles.extend(
-        ["results/coverage_and_norm/spike_norm/%s_scale_factors.tsv"%model\
-        for model in config["coverage_and_norm"]["spike_norm"]])
-
+    models = lookup_in_config(config, ["coverage_and_norm", "spike_norm"], "")
+    for model in models: 
+        these_samples = filter_samples(pep, \
+            lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "filter"], "not input_sample.isnull()"))
+        for norm_type in lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "methods"], []):
+            outfiles.extend(["results/coverage_and_norm/spike_norm/%s/%s_%s.bw"%(model, sample, norm_type) for sample in these_samples]) 
 
     return outfiles
 
 rule run_spike_norm:
     input:       
-        determine_spike_norm_files(config)
+        determine_spike_norm_files(config, pep)
 
 rule get_raw_coverage:
     input:
@@ -621,7 +620,8 @@ def pull_bws_for_spike_norm_models(modelname, config, pep, ext_or_inp = "ext"):
     return files
 
 def pull_labels_for_spike_norm_models(modelname, config, pep):
-    these_samples = filter_samples(pep, lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
+    these_samples = filter_samples(pep, \
+    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
     return " ".join(these_samples)
 
 rule spike_norm_table:
@@ -632,7 +632,7 @@ rule spike_norm_table:
         fragtable = "results/quality_control/frags_per_contig/all_samples.tsv",
         md= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "metadata"], None),
     output:
-        outtext="results/coverage_and_norm/spike_norm/{model}_scale_factors.tsv"
+        outtext="results/coverage_and_norm/spike_norm/{model}/{model}_scale_factors.tsv"
     log:
         stdout="results/coverage_and_norm/logs/spike_norm/{model}/scale_factors.log",
         stderr="results/coverage_and_norm/logs/spike_norm/{model}/scale_factors.err"
@@ -658,3 +658,37 @@ rule spike_norm_table:
         "--expected_regions {input.inbed} "
         "--samples {params.labels} "
         "> {log.stdout} 2> {log.stderr} "
+
+
+def get_sample_for_scale_byfactor(modelname, sample, config, pep): 
+    file_sig = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filesignature"],\
+    "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
+    return file_sig%(sample)
+
+rule bwtools_scale_byfactor:
+    input:
+        infile = lambda wildcards: get_sample_for_scale_byfactor(wildcards.model, wildcards.sample, config, pep),
+        sf_tab="results/coverage_and_norm/spike_norm/{model}/{model}_scale_factors.tsv"
+    output:
+        "results/coverage_and_norm/spike_norm/{model}/{sample}_{norm}.bw"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config),
+        pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1)
+    wildcard_constraints:
+        norm="total_frag_sfs|spike_frag_sfs|nonspike_frag_sfs|deseq2_sfs|deseq2_spike_sfs|regress_rpm_sfs"
+    log:
+        stdout="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.log",
+        stderr="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py manipulate "
+       "{input.infile} {output} "
+       "--res {params.resolution} --operation scale_byfactor "
+       "--pseudocount {params.pseudocount} "
+       "--scalefactor_table {input.sf_tab} "
+       "--scalefactor_id {wildcards.sample} {wildcards.norm} "
+       "{params.dropNaNsandInfs} "
+       "> {log.stdout} 2> {log.stderr}"

@@ -115,7 +115,7 @@ coverage_and_norm:
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
-            methods: ["regress", "deseq2", "deseq2_spike", "spike_frag", "spike_enrich"]
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs"]
 
 
     # Which samples should be smoothed? Smoothing currently only supported for
