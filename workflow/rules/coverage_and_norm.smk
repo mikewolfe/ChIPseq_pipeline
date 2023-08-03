@@ -545,7 +545,7 @@ def pull_bws_for_bwtools_multicompare(modelname, config, pep):
     lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_groupA']))
 
     groupB_filter = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_groupB'], "")
-    file_sig = lookup_in_config(config, ['coverage_and_norm', modelname, 'filesignature'],\
+    file_sig = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filesignature'],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
     groupA = [file_sig%(sample) for sample in groupA_samples]
     if groupB_filter is not "":
@@ -624,11 +624,19 @@ def pull_labels_for_spike_norm_models(modelname, config, pep):
     lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
     return " ".join(these_samples)
 
+def pull_expected_regions_spike_norm_models(modelname, config, pep):
+    spikeregions = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "regions"], "")
+    if spikeregions is not "":
+        out = "--expected_regions %s"%(spikeregions)
+    else:
+        out = ""
+    return out
+
 rule spike_norm_table:
     input:
         inextbws= lambda wildcards: pull_bws_for_spike_norm_models(wildcards.model,config, pep, ext_or_inp = "ext"),
         ininpbws= lambda wildcards: pull_bws_for_spike_norm_models(wildcards.model,config, pep, ext_or_inp = "inp"),
-        inbed= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "regions"], None),
+        inbed= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "regions"], "config/config.yaml"),
         fragtable = "results/quality_control/frags_per_contig/all_samples.tsv",
         md= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "metadata"], None),
     output:
@@ -640,6 +648,7 @@ rule spike_norm_table:
         labels = lambda wildcards: pull_labels_for_spike_norm_models(wildcards.model, config, pep),
         pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1),
         spikecontigs = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "spikecontigs"], None),
+        spikeregions = lambda wildcards: pull_expected_regions_spike_norm_models(wildcards.model, config, pep),
         res = RES
     threads:
         5
@@ -653,9 +662,9 @@ rule spike_norm_table:
         "--ext_bws {input.inextbws} "
         "--inp_bws {input.ininpbws} "
         "--pseudocount {params.pseudocount} "
+        "{params.spikeregions} "
         "--spikecontigs {params.spikecontigs} "
         "--res {params.res} "
-        "--expected_regions {input.inbed} "
         "--samples {params.labels} "
         "> {log.stdout} 2> {log.stderr} "
 

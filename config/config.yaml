@@ -117,6 +117,17 @@ coverage_and_norm:
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs"]
 
+        all_samples_no_expected:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'not input_sample.isnull()'
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "regress_rpm_sfs"]
+
 
     # Which samples should be smoothed? Smoothing currently only supported for
     # spike-in and median normalization. This smooths everything.
