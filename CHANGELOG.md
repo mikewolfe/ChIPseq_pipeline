@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
-- Spike-in based scaling using DEseq2, spike-in counts, or Bonhoure et al. approaches
+- Spike-in based scaling using DEseq2, spike-in counts, or Bonhoure et al.
+  approaches
 - Deduplication with Picard MarkDuplicates.
 
+### Changes
+- Update versions of some packages including ncbi-acc-download to get around
+  rate filtering issue and multiqc to deal with python updates
+
 ### Bug fixes
-- Issue with `bwtools_multiprocessing` not correctly identifying needed input files
+- Issue with `bwtools_multiprocessing` not correctly identifying needed input
+  files
 
 
 ## 0.3.0 - 2023-07-15
