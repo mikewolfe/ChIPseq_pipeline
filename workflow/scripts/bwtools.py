@@ -671,9 +671,6 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
 
     full_y = np.concatenate(full_y)
     full_X = np.concatenate(full_X)
-    print(full_y)
-    print(full_X)
-    print(expected_locs)
     # make sure there are no NaNs from masked areas
     remove_nansandinfs = np.logical_and(np.isfinite(full_X), np.isfinite(full_y))
     # get residuals
@@ -682,7 +679,8 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     print(resids)
     print(np.mean(resids))
     # get sum of positive residuals and return
-    resids[resids < 0] = 0
+    if expected_locs is not None:
+        resids[resids < 0] = 0
     return np.mean(resids)
 
 

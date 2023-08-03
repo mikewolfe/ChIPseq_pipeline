@@ -211,7 +211,7 @@ rule bowtie2_map_se:
 
 rule bam_sort:
     input:
-        "results/alignment/bowtie2/{sample}.bam"
+        "results/alignment/bowtie2/{sample}_marked.bam"
     output:
         "results/alignment/bowtie2/{sample}_sorted.bam"
     log:
@@ -228,8 +228,31 @@ rule bam_index:
         "results/alignment/bowtie2/{sample}_sorted.bam.bai"
     log:
         stdout="results/alignment/logs/bowtie2/{sample}_bt2_index.log",
-        stderr="results/alignment/logs/bowtie2/{sample}_bt2_index.log"
+        stderr="results/alignment/logs/bowtie2/{sample}_bt2_index.err"
     conda:
         "../envs/alignment.yaml"
     shell:
         "samtools index {input} {output} > {log.stdout} 2> {log.stderr}"
+
+rule bam_markduplicates:
+    input:
+        "results/alignment/bowtie2/{sample}.bam"
+    output:
+        outbam=temp("results/alignment/bowtie2/{sample}_marked.bam"),
+        outmetrics= "results/alignment/picard/{sample}_dup_metrics.txt"
+
+    log:
+        stdout="results/alignment/logs/picard/{sample}_markdups.log",
+        stderr="results/alignment/logs/picard/{sample}_markdups.err"
+    resources:
+        mem_mb=20000
+    conda:
+        "../envs/alignment.yaml"
+    shell:
+        "picard -Xmx20g MarkDuplicates "
+        "-ASSUME_SORT_ORDER queryname "
+        "-I {input} "
+        "-O {output.outbam} "
+        "-M {output.outmetrics} "
+        "> {log.stdout} "
+        "2> {log.stderr} "
