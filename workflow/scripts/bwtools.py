@@ -347,8 +347,8 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
 def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
-def traveling_ratio(array, res, wsize, maxsize):
-    return arraytools.traveling_ratio(array, wsize = wsize//res, length_cutoff = maxsize//res)
+def traveling_ratio(array, res, wsize):
+    return arraytools.traveling_ratio(array, wsize = wsize//res)
 
 def traveling_ratio_fixed(array, res, wsize, relative_location):
     if relative_location < wsize:
@@ -426,9 +426,9 @@ def query_main(args):
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, args.res, 50, 1000),
+            'TR' : lambda array: traveling_ratio(array, args.res, args.wsize),
             'TR_fixed' : lambda array: traveling_ratio_fixed(array, args.res, args.wsize, args.upstream + args.TR_A_center),
-            'summit_loc': lambda array: summit_loc(array, args.res, 50, args.upstream)}
+            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
@@ -676,8 +676,6 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     # get residuals
     resids = full_y[remove_nansandinfs] - full_X[remove_nansandinfs]*regress_slope
     
-    print(resids)
-    print(np.mean(resids))
     # get sum of positive residuals and return
     if expected_locs is not None:
         resids[resids < 0] = 0

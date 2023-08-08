@@ -191,10 +191,7 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, peak = None, length_cutoff = 1000):
-    # shouldn't do this with anything less than 1000 bp
-    if len(array) < length_cutoff:
-        return np.nan
+def traveling_ratio(array, wsize = 50, peak = None):
     # if peak isn't specified then dynamically find it
     if peak is None:
         peak = relative_summit_loc(array, wsize)
