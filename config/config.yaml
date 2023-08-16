@@ -234,7 +234,7 @@ coverage_and_norm:
             # Choose an average calculation as the summary statistic. Other 
             # operations include max, min, and median. NaNs and Infs are ignored
             # for the summary calc
-            operation_within: "mean"
+            within_operation: "mean"
 
         # Model 2: Take the average of all genotypeA tracks and subtract the
         # average of all genotypeB tracks. 
@@ -248,11 +248,27 @@ coverage_and_norm:
             # Choose an average calculation as the summary statistic. Other 
             # operations include max, min, and median. NaNs and Infs are ignored
             # for the summary calc
-            operation_within: "mean"
+            within_operation: "mean"
             # Choose a subtraction operation for calculations between the
             # summaries of the two groups. Other operations include divide,
             # add, log2ratio, and recipratio.
-            operation_btwn: "subtract"
+            between_operation: "subtract"
+
+        mean_genotypeA_mean_genotypeB_log2ratio:
+            # Filter for genotype A files but exclude the input samples
+            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            # Filter for genotype B files but exclude the input samples
+            filter_groupB: 'genotype == "B" and not input_sample.isnull()'
+            # Choose the raw bigwigs as the inputs for each of these samples
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Choose an average calculation as the summary statistic. Other 
+            # operations include max, min, and median. NaNs and Infs are ignored
+            # for the summary calc
+            within_operation: "mean"
+            # Choose a subtraction operation for calculations between the
+            # summaries of the two groups. Other operations include divide,
+            # add, log2ratio, and recipratio.
+            between_operation: "log2ratio"
 
 # Options to control quality control
 quality_control:
