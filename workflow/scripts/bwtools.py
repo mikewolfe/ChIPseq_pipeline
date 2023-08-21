@@ -625,7 +625,7 @@ def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
     scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
     return scale_array(array, scale_factor, pseudocount)
 
-def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res):
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res, upstream = 0, downstream = 0):
     import bed_utils
     from sklearn.linear_model import LinearRegression
     if expected_locs is not None:
@@ -636,7 +636,14 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
         mask_array[contig] = np.ones(len(ext_array[contig]), bool)
     if expected_locs is not None:
         for region in inbed:
-            if region["chrm"] in spike_contigs:
+            if region["chrm"] in spike_contigs: 
+                array_len = len(mask_array[contig])
+                if region["strand"] == "-":
+                    left_coord = max(region["start"] - args.downstream, 0)
+                    right_coord = min(region["end"] + args.upstream, array_len * res)
+                else:
+                    left_coord = max(region["start"] - args.upstream, 0)
+                    right_coord = min(region["end"] + args.downstream, array_len * res)
                 mask_array[region["chrm"]][region["start"]//res:region["end"]//res] = 0
     
 
@@ -751,12 +758,16 @@ def normfactor_main(args):
                     scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag_sfs"].values[0], args.pseudocount),\
                     args.spikecontigs,
                     args.expected_regions,
-                    args.res))
+                    args.res,
+                    args.upstream,
+                    args.downstream))
             regress_total.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0], args.pseudocount),\
                     scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag_sfs"].values[0], args.pseudocount),\
                     args.spikecontigs,
                     args.expected_regions,
-                    args.res))
+                    args.res,
+                    args.upstream,
+                    args.downstream))
             regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
             regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0])
             regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
@@ -857,8 +868,8 @@ if __name__ == "__main__":
             should be set no lower than the resolution of the input file")
     parser_query.add_argument('--regions', type=str, help = "regions to grab data from")
     parser_query.add_argument('--coords', type = str, help = "When running in 'identity' mode do you want 'relative_start', 'relative_center', 'relative_end' or 'absolute' coords? Default = 'absolute'")
-    parser_query.add_argument('--upstream', type=int, help = "bp upstream to add")
-    parser_query.add_argument('--downstream', type = int, help = "bp downstream to add")
+    parser_query.add_argument('--upstream', type=int, help = "bp upstream to add", default = 0)
+    parser_query.add_argument('--downstream', type = int, help = "bp downstream to add", default = 0)
     parser_query.add_argument('--samp_names', type = str, nargs = "+", help = "sample names for each file")
     parser_query.add_argument('--summarize', type = str, help = "How to summarize data. 'identity' reports \
             each data point. 'single' gives a single number summary. Default = 'identity'", default = 'identity')
@@ -920,6 +931,8 @@ if __name__ == "__main__":
             help = "Add value to all unmasked regions before ratio calculations. \
                     Default = 1 ")
     parser_normfactor.add_argument('--expected_regions', type = str, help = "bed file of regions where signal is expected")
+    parser_normfactor.add_argument('--upstream', type=int, help = "bp upstream to add to expected regions", default = 0)
+    parser_normfactor.add_argument('--downstream', type = int, help = "bp downstream to add to expected regions", default = 0)
     parser_normfactor.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")

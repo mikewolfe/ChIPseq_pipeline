@@ -649,7 +649,9 @@ rule spike_norm_table:
         pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1),
         spikecontigs = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "spikecontigs"], None),
         spikeregions = lambda wildcards: pull_expected_regions_spike_norm_models(wildcards.model, config, pep),
-        res = RES
+        res = RES,
+        upstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "downstream"], 0)
     threads:
         5
     conda:
@@ -666,6 +668,8 @@ rule spike_norm_table:
         "--spikecontigs {params.spikecontigs} "
         "--res {params.res} "
         "--samples {params.labels} "
+        "--upstream {params.upstream} "
+        "--downstream {params.downstream} "
         "> {log.stdout} 2> {log.stderr} "
 
 
