@@ -117,7 +117,7 @@ coverage_and_norm:
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
-            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs"]
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_sfs", "tmm_spike_sfs"]
 
         all_samples_no_expected:
             metadata: "pep/test_samples.csv"
