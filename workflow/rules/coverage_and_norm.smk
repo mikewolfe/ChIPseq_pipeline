@@ -689,7 +689,7 @@ rule bwtools_scale_byfactor:
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
         pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1)
     wildcard_constraints:
-        norm="total_frag_sfs|spike_frag_sfs|nonspike_frag_sfs|deseq2_sfs|deseq2_spike_sfs|regress_rpm_sfs|regress_total_rpm_sfs|regress_spike_rpm_sfs|tmm_sfs|tmm_spike_sfs"
+        norm="total_frag_sfs|spike_frag_sfs|nonspike_frag_sfs|deseq2_sfs|deseq2_spike_sfs|regress_rpm_sfs|regress_total_rpm_sfs|regress_spike_rpm_sfs|tmm_rpm_sfs|tmm_spike_rpm_sfs"
     log:
         stdout="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.log",
         stderr="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.err"
