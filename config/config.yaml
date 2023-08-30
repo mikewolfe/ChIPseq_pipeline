@@ -522,7 +522,55 @@ postprocessing:
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summary_func: "TR_fixed"
+            summary_func: "TR"
+            bwtools_query_params: "--TR_A_center 40 "
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 6 - look at the identified beta peak locations for the traveling
+        # ratio
+        genotypeA_all_genes_TR_A:
+            # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR_A"
+            bwtools_query_params: "--TR_A_center 40 "
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 6 - look at the identified beta peak locations for the traveling
+        # ratio
+        genotypeA_all_genes_TR_B:
+            # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR_B"
             bwtools_query_params: "--TR_A_center 40 "
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
