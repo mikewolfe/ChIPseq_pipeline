@@ -88,8 +88,12 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
 
 def determine_extracted_samples(pep):
     samp_table = pep.sample_table
-    samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
-    return samples.tolist()
+    if "input_sample" in samp_table.columns:
+        samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
+        samples = samples.tolist()
+    else:
+        samples = []
+    return samples
 
 def filter_samples(pep, filter_text):
     samp_table = pep.sample_table
