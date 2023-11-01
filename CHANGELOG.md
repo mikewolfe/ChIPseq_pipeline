@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   et al.  approaches
 - Deduplication with Picard MarkDuplicates.
 - Ability to get A and B average counts for the traveling ratio
+- Remove default max size for traveling ratio calculations
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around

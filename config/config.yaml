@@ -454,6 +454,7 @@ postprocessing:
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
             summary_func: "RPP"
+            bwtools_query_params: "--TR_A_center 100 "
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
         

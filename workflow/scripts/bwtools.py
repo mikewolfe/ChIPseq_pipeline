@@ -359,7 +359,9 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
                 outf.write(line)
 
 
-def relative_polymerase_progression(array):
+def relative_polymerase_progression(array, res, tr_a=None, upstream = 0):
+    if tr_a:
+        array = array[(upstream + tr_a)//res:]
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
 def traveling_ratio(array, res, wsize, peak_loc = None, upstream = 0, out = "ratio"):
@@ -466,7 +468,7 @@ def query_main(args):
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
-            'RPP' : relative_polymerase_progression,
+            'RPP' : lambda array: relative_polymerase_progression(array, args.res, args.TR_A_center, args.upstream),
             'TR' : lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
             'TR_A': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
             'TR_B': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
