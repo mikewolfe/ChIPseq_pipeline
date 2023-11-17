@@ -381,6 +381,16 @@ variant_calling:
     reference:
         column: "genome"
 
+assembly:
+    filter: "input_sample.isnull() and genotype == 'A'"
+    unicycler:
+        unicycler_illumina_params: 
+            value: " "
+    quast:
+        quast_params: 
+            value: " "
+
+
 
 # Control for the postprocessing submodule
 postprocessing:

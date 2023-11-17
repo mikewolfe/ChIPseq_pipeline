@@ -165,6 +165,7 @@ include: "workflow/rules/peak_calling.smk"
 include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/motif_calling.smk"
+include: "workflow/rules/assembly.smk"
 
 
 

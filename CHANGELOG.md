@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- Assembly of reads to look for genomic variants using unicycler and quast
 - Spike-in based scaling using DEseq2, spike-in counts, edgeR TMM, or Bonhoure
   et al.  approaches
 - Deduplication with Picard MarkDuplicates.
