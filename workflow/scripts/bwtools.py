@@ -262,20 +262,45 @@ def manipulate_main(args):
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
-            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount) }
+            "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
-    # read in file 
-    inf = pyBigWig.open(args.infile)
-    
-    # convert to a dictionary of arrays
-    arrays = bigwig_to_arrays(inf, res = args.res)
-    
-    # perform operation on arrays
-    arrays = operation_dict[args.operation](arrays)
+    # Extra logic if trying to downsample everything which requires both strands
+    # for stranded data
+    # if stranded also open minus strand file
+    if args.operation == "downsample":
 
-    # write out file
-    write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
-    inf.close()
+        # read in file 
+        inf = pyBigWig.open(args.infile)
+    
+        # convert to a dictionary of arrays
+        arrays = bigwig_to_arrays(inf, res = args.res, nan_to_zero = True)
+        if args.minus_strand is not None:
+            inf_minus = pyBigWig.open(args.minus_strand)
+            arrays_minus = bigwig_to_arrays(inf_minus, res = args.res, nan_to_zero = True)
+            dwn_plus, dwn_minus = downsample(arrays, args.scalefactor_table, args.scalefactor_id, arrays_minus)
+
+            write_arrays_to_bigwig(args.outfile, dwn_plus, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            write_arrays_to_bigwig(args.minus_strand_out, dwn_minus, inf_minus.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            inf.close()
+            inf_minus.close()
+        else:
+            dwn_plus, dwn_minus = downsample(arrays, args.scalefactor_table, args.scalefactor_id)
+            write_arrays_to_bigwig(args.outfile, dwn_plus, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+            inf.close()
+    else:
+
+        # read in file 
+        inf = pyBigWig.open(args.infile)
+    
+        # convert to a dictionary of arrays
+        arrays = bigwig_to_arrays(inf, res = args.res)
+
+        # perform operation on arrays
+        arrays = operation_dict[args.operation](arrays)
+
+        # write out file
+        write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
+        inf.close()
 
 def read_multiple_bws(bw_files, res = 1):
     all_bws = {}
@@ -359,9 +384,7 @@ def query_summarize_identity(all_bws, samp_names, samp_to_fname, inbed, res, gzi
                 outf.write(line)
 
 
-def relative_polymerase_progression(array, res, tr_a=None, upstream = 0):
-    if tr_a:
-        array = array[(upstream + tr_a)//res:]
+def relative_polymerase_progression(array):
     return arraytools.weighted_center(array, only_finite = True, normalize = True) 
 
 def traveling_ratio(array, res, wsize, peak_loc = None, upstream = 0, out = "ratio"):
@@ -436,6 +459,36 @@ def query_summarize_single(all_bws, samp_names, samp_to_fname, inbed, res, summa
                 outf.write(line)
 
 
+def gini_coefficient(data, unbiased = False):
+    '''
+    Calculate the gini coefficient for a 1D set of data
+    Arguments:
+        data - 1D numpy array of data
+        unbiased - boolean to determine if unbiased estimator should be used
+    References:
+        https://en.wikipedia.org/wiki/Gini_coefficient
+        https://www.statsdirect.com/help/nonparametric_methods/gini_coefficient.htm
+        https://stackoverflow.com/questions/48999542/more-efficient-weighted-gini-coefficient-in-python
+    Formula:
+        Standard:
+        $G = \frac{1}{n} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+        Unbiased:                                                                
+        $G = \frac{1}{n-1} (n + 1 - 2 \frac{\sum_{i=1}^n (n + 1 - i)y_i}{\sum_{i=1}^n y_i})$
+    '''
+    data_sorted = np.sort(data)
+    n = len(data)
+    # the sum of the cumulative sum vector gives the numerator when the data
+    # is sorted in ascending order. The float here prevents integer overflows
+    cumulative = np.cumsum(data_sorted, dtype = float)
+    # the last value in a cumulative vector is the total sum
+    stat = (n + 1 - 2 * np.sum(cumulative)/ cumulative[-1])
+    if unbiased:
+        stat = stat/(n-1)
+    else:
+        stat = stat/n
+    return stat
+
+
 def query_main(args):
     import bed_utils
 
@@ -468,13 +521,14 @@ def query_main(args):
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
-            'RPP' : lambda array: relative_polymerase_progression(array, args.res, args.TR_A_center, args.upstream),
+            'RPP' : relative_polymerase_progression,
             'TR' : lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
             'TR_A': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
             'TR_B': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
             # kept for compatibility
             'TR_fixed' : lambda array: traveling_ratio(array, args.res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
-            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream)}
+            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream),
+            'Gini': lambda array: gini_coefficient(array)}
     try:
         summary_func = summary_funcs[args.summary_func]
     except KeyError:
@@ -642,72 +696,148 @@ def multicompare_main(args):
             res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
     close_multiple_bigwigs(groupA_handles)
 
-def single_num_summary(arrays, function, contigs = None):
+def single_num_summary(arrays, function, contigs = None, expected_locs = None, res = None):
+    import bed_utils
     if contigs is None:
         contigs = arrays.keys()
-    out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
-    i = 0
-    for chrm in contigs:
-        arrsize = arrays[chrm].size
-        out_array[i:i+arrsize] = arrays[chrm][:]
-        i = i + arrsize
+    if expected_locs is not None:
+        out_array = []
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(sample_array[this_chrm])
+            left_coord = max(region["start"] - args.upstream, 0)
+            right_coord = min(region["end"] + args.downstream, array_len * res)
+            out_array.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+        out_array = np.concatenate(out_array) 
+    else:
+        out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)
+        i = 0
+        for chrm in contigs:
+            arrsize = arrays[chrm].size
+            out_array[i:i+arrsize] = arrays[chrm][:]
+            i = i + arrsize
     return function(out_array)
 
 
-def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = None):
+def stranded_single_num_summary(arrays_plus, arrays_minus, function, contigs = None, expected_locs = None, res = None, antisense = False):
+    import bed_utils
     if contigs is None:
         contigs = arrays_plus.keys()
-    out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
-    i = 0
-    for chrm in contigs:
-        arrsize = arrays_plus[chrm].size
-        out_array[i:i+arrsize] = arrays_plus[chrm][:]
-        i = i + arrsize
-    for chrm in contigs:
-        arrsize = arrays_minus[chrm].size
-        out_array[i:i+arrsize] = arrays_minus[chrm][:]
-        i = i + arrsize
+
+    if expected_locs is not None:
+        out_array = []
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(arrays_plus[this_chrm])
+            if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                left_coord = max(region["start"] - args.downstream, 0)
+                right_coord = min(region["end"] + args.upstream, array_len * res)
+                out_array.append(arrays_minus[this_chrm][left_coord//res:right_coord//res])
+            else:
+                left_coord = max(region["start"] - args.upstream, 0)
+                right_coord = min(region["end"] + args.downstream, array_len * res)
+                out_array.append(arrays_plus[this_chrm][left_coord//res:right_coord//res])
+        out_array = np.concatenate(out_array)
+    else:
+        out_array = np.zeros(np.sum([arrays_plus[chrm].size for chrm in contigs])*2, float)
+        i = 0
+        for chrm in contigs:
+            arrsize = arrays_plus[chrm].size
+            out_array[i:i+arrsize] = arrays_plus[chrm][:]
+            i = i + arrsize
+        for chrm in contigs:
+            arrsize = arrays_minus[chrm].size
+            out_array[i:i+arrsize] = arrays_minus[chrm][:]
+            i = i + arrsize
 
     return function(out_array)
 
-def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, M_trim = 30, A_trim = 5, pseudocount = 0):
+def get_TMM_factor(sample_array, reference_array, total_sa, total_ra, spike_contigs, minus_sa = None, minus_ra = None, expected_locs = None, res = None, antisense = False, M_trim = 0.30, A_trim = 0.05, pseudocount = 0, A_cutoff = -1e10):
+    from scipy import stats
+    import bed_utils
     # turn everything into one big array
     sa = []
     ra = []
-    for contig in spike_contigs:
-        sa.append(sample_array[contig])
-        ra.append(reference_array[contig])
-    if minus_sa is not None:
-        sa.append(minus_sa[contig])
-        ra.append(minus_ra[contig])
+    if expected_locs is not None:
+        inbed = bed_utils.BedFile()
+        inbed.from_bed_file(expected_locs)
+        for region in inbed:
+            this_chrm = region["chrm"]
+            array_len = len(sample_array[this_chrm])
+            # stranded locations
+            if minus_sa is not None:
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
+                    left_coord = max(region["start"] - args.downstream, 0)
+                    right_coord = min(region["end"] + args.upstream, array_len * res)
+                    sa.append(minus_sa[this_chrm][left_coord//res:right_coord//res])
+                    ra.append(minus_ra[this_chrm][left_coord//res:right_coord//res])
+                else:
+                    left_coord = max(region["start"] - args.upstream, 0)
+                    right_coord = min(region["end"] + args.downstream, array_len * res)
+                    sa.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+                    ra.append(reference_array[this_chrm][left_coord//res:right_coord//res])
+            # unstranded locations
+            else:
+                left_coord = max(region["start"] - args.upstream, 0)
+                right_coord = min(region["end"] + args.downstream, array_len * res)
+                sa.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+                ra.append(reference_array[this_chrm][left_coord//res:right_coord//res])
+
+    else:
+        for contig in spike_contigs:
+            sa.append(sample_array[contig])
+            ra.append(reference_array[contig])
+        if minus_sa is not None:
+            sa.append(minus_sa[contig])
+            ra.append(minus_ra[contig])
 
     sa = np.concatenate(sa)
     ra = np.concatenate(ra)
     # Add a pseudo count
     sa = sa + pseudocount
     ra = ra + pseudocount
-    # filter out locations < 0
-    mask = np.logical_and(np.logical_and(np.isfinite(sa),sa > 0), np.logical_and( np.isfinite(ra) , ra > 0))
-    sa = sa[mask]
-    ra = ra[mask]
+    
+
+    # adapted from EdgeR code here: https://rdrr.io/bioc/edgeR/src/R/calcNormFactors.R
 
     # calculate M values
-
     Mvals = np.log2(sa/total_sa) - np.log2(ra/total_ra)
     # Calculate A values
     Avals = (np.log2(sa/total_sa) + np.log2(ra/total_ra))/2
+    # calculate estimated variance
+    v = (total_sa - sa)/total_sa/sa + (total_ra - ra)/total_ra/ra
+
+    # get finite values
+    mask = np.logical_and(np.logical_and(np.isfinite(Mvals),np.isfinite(Avals)), Avals > A_cutoff)
+
+    Mvals = Mvals[mask]
+    Avals = Avals[mask]
+    v = v[mask]
+
+    if(max(abs(Mvals)) < 1e-6):
+        return 1
 
     # Determiming trimming based on A and M
-    M_trim_mask = np.logical_and(Mvals > np.percentile(Mvals, M_trim), Mvals < np.percentile(Mvals, 100-M_trim))
-    A_trim_mask = np.logical_and(Avals > np.percentile(Avals, A_trim), Avals < np.percentile(Avals, 100-A_trim))
-    sa = sa[np.logical_and(M_trim_mask, A_trim_mask)]
-    ra = ra[np.logical_and(M_trim_mask, A_trim_mask)]
+    # Following EdgeRs copy of the original mean function
+    total_M = len(Mvals)
+    lo_M = np.floor(total_M*M_trim) + 1
+    hi_M = total_M + 1 - lo_M
+    lo_A = np.floor(total_M*A_trim) + 1
+    hi_A = total_M + 1 - lo_A
+    M_trim_mask = np.logical_and(stats.rankdata(Mvals) >= lo_M, stats.rankdata(Mvals)<= hi_M)
+    A_trim_mask = np.logical_and(stats.rankdata(Avals) >= lo_A, stats.rankdata(Avals)<= hi_A)
+    Mvals = Mvals[np.logical_and(M_trim_mask, A_trim_mask)]
+    Avals = Avals[np.logical_and(M_trim_mask, A_trim_mask)]
+    v = v[np.logical_and(M_trim_mask, A_trim_mask)]
 
     # Calculate TMM values for final TMM calc
-    Mr_gk = np.log2(sa/total_sa)-np.log2(ra/total_ra)
-    # lifted from edgeR code here: https://rdrr.io/bioc/edgeR/src/R/calcNormFactors.R
-    v_gk = (total_sa - sa)/total_sa/sa + (total_ra - ra)/total_ra/ra
-    TMM = np.power(2, np.sum(Mr_gk/v_gk)/np.sum(1/v_gk))
+    TMM = np.power(2, np.sum(Mvals/v)/np.sum(1/v))
+    if not np.isfinite(TMM):
+        TMM = 1
     return TMM
 
 def geometric_mean(arrays, axis = 0, pseudocount = 1.0):
@@ -735,12 +865,87 @@ def scale_byfactor(array, scalefactor_table, scalefactor_id, pseudocount):
     scale_factor = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], scalefactor_id[1]].values[0]
     return scale_array(array, scale_factor, pseudocount)
 
-def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs, res, upstream = 0, downstream = 0):
+def to_one_array(array, minus_array = None):
+    indices = {}
+    indices["+"] = {}
+    start = 0
+    out_array = []
+    for chrm in array.keys():
+        indices["+"][chrm] = [start, start + array[chrm].size]
+        start += array[chrm].size
+        out_array.append(array[chrm])
+
+    if minus_array is not None:
+        indices["-"] = {}
+        for chrm in minus_array.keys():
+            indices["-"][chrm] = [start, start + minus_array[chrm].size]
+            start += minus_array[chrm].size
+            out_array.append(minus_array[chrm])
+    out_array = np.concatenate(out_array)
+
+    return (indices, out_array)
+
+
+def from_one_array(array, indices):
+    plus_out_array = {}
+    minus_out_array = {}
+    for key in indices["+"]:
+        chrm_idx = indices["+"][key]
+        plus_out_array[key] = array[chrm_idx[0]:chrm_idx[1]]
+    if "-" in indices.keys():
+        for key in indices["-"]:
+            chrm_idx = indices["-"][key]
+            minus_out_array[key] = array[chrm_idx[0]:chrm_idx[1]]
+
+    return (plus_out_array, minus_out_array)
+
+
+def downsample_array(array, total, minus_array = None, seed = 42):
+    indices, one_array = to_one_array(array, minus_array)
+
+    total_count = int(np.sum(one_array))
+
+    count_to_remove = total_count - int(total)
+
+    if count_to_remove <= 0:
+        raise ValueError("Trying to downsample more (%s) than total count (%s)"%(total, total_count))
+
+    overall_idx = np.arange(0, one_array.size, dtype = int)
+
+    rng = np.random.default_rng(seed = seed)
+
+    dwnsample_idx = rng.choice(overall_idx, size = count_to_remove, p = one_array/total_count, replace = True)
+    for idx in dwnsample_idx:
+        one_array[idx] = one_array[idx] - 1
+
+    return from_one_array(one_array, indices)
+
+
+def downsample(array, scalefactor_table, scalefactor_id, minus_array = None):
+    import pandas as pd
+
+    sf_table = pd.read_csv(scalefactor_table, sep = "\t")
+    if scalefactor_id[1] == "nonspike_frags" or scalefactor_id[1] == "spike_frags":
+        total = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], "total_frags"].values[0]
+        spike = sf_table.loc[sf_table["sample_name"] == scalefactor_id[0], "spike_frags"].values[0]
+        if scalefactor_id[1] == "nonspike_frags":
+            scale_factor = total/(total-spike)
+        else:
+            scale_factor = total/spike
+    else:
+        scale_factor = 1
+    dwn_total = int(np.min(sf_table.loc[:, scalefactor_id[1]])*scale_factor)
+
+    return downsample_array(array, dwn_total, minus_array)
+
+def get_regression_estimates(ext_array, input_array, spike_contigs, expected_locs= None, res = None, upstream = 0, downstream = 0):
     import bed_utils
     from sklearn.linear_model import LinearRegression
     if expected_locs is not None:
         inbed = bed_utils.BedFile()
         inbed.from_bed_file(expected_locs)
+    if spike_contigs is None:
+        spike_contigs = ext_array.keys()
     mask_array = {}
     for contig in spike_contigs:
         mask_array[contig] = np.ones(len(ext_array[contig]), bool)
@@ -799,7 +1004,7 @@ def get_regression_estimates(ext_array, input_array, spike_contigs, expected_loc
     return np.mean(resids)
 
 
-def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res):
+def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus,  spike_contigs, expected_locs, res, antisense = False):
     import bed_utils
     from sklearn.linear_model import LinearRegression
     if expected_locs is not None:
@@ -814,7 +1019,7 @@ def get_stranded_regression_estimates(ext_array_plus, ext_array_minus, inp_array
         for region in inbed:
             if region["chrm"] in spike_contigs:
                 array_len = len(mask_array["+"][contig])
-                if region["strand"] == "-":
+                if (region["strand"] == "-" and not antisense) or (region["strand"] == "+" and antisense):
                     left_coord = max(region["start"] - args.downstream, 0)
                     right_coord = min(region["end"] + args.upstream, array_len * res)
                     mask_array["-"][region["chrm"]][left_coord//res:right_coord//res] = 0
@@ -991,7 +1196,7 @@ def normfactor_main(args):
     overall = overall.merge(tmm2_column, on = 'sample_name', how = 'left')
 
     # DEseq2 size factors spike-in only
-    if args.spikecontigs is not None:
+    if args.spikecontigs is not None or args.expected_regions is not None:
     
         # stranded version
         if args.ext_bws_minus is not None:
@@ -1000,7 +1205,8 @@ def normfactor_main(args):
             for array_plus, array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, args.samples):
                 compared_minus = compare_divide(add_pseudocount(array_minus, args.pseudocount), geom_means_minus)
                 compared_plus = compare_divide(add_pseudocount(array_plus, args.pseudocount), geom_means_plus)
-                deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian, contigs = args.spikecontigs))
+                deseq2_sfs.append(stranded_single_num_summary(compared_plus, compared_minus, np.nanmedian, contigs = args.spikecontigs,
+                    expected_locs = args.expected_regions, res = args.res, antisense = args.antisense))
 
             deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
             overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
@@ -1008,7 +1214,8 @@ def normfactor_main(args):
         else:
             deseq2_sfs = []
             for array, sample in zip(bw_arrays, args.samples):
-                deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, contigs = args.spikecontigs))
+                deseq2_sfs.append(single_num_summary(compare_divide(add_pseudocount(array, args.pseudocount), geom_means), np.nanmedian, 
+                    contigs = args.spikecontigs, expected_locs = args.expected_regions, res = args.res))
             deseq2_column = pd.DataFrame(data = {'deseq2_spike_sfs': deseq2_sfs, 'sample_name': args.samples})
             overall = overall.merge(deseq2_column, on = 'sample_name', how = 'left')
 
@@ -1031,6 +1238,9 @@ def normfactor_main(args):
                             args.spikecontigs,
                             minus_sa = array_minus,
                             minus_ra = bw_minus_arrays[high_frag_index],
+                            expected_locs = args.expected_regions,
+                            res = args.res,
+                            antisense = args.antisense,
                             pseudocount = args.pseudocount))
     
         # unstranded version
@@ -1048,6 +1258,8 @@ def normfactor_main(args):
                             overall.loc[overall["sample_name"] == sample, "total_frag"].values[0],
                             overall.loc[overall["sample_name"] == ref_sample, "total_frag"].values[0],
                             args.spikecontigs,
+                            expected_locs = args.expected_regions,
+                            res = args.res,
                             pseudocount = args.pseudocount))
     
 
@@ -1077,7 +1289,8 @@ def normfactor_main(args):
                         scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"spike_frag"].values[0]/1e6, args.pseudocount),\
                         args.spikecontigs,
                         args.expected_regions,
-                        args.res))
+                        args.res,
+                        antisense = args.antisense))
                 regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
@@ -1163,6 +1376,8 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('infile', type=str, 
             help="file to convert from")
     parser_manipulate.add_argument('outfile', type=str, help="file to convert to")
+    parser_manipulate.add_argument("--minus_strand", type = str, help = "minus strand file for stranded data")
+    parser_manipulate.add_argument("--minus_strand_out", type = str, help = "minus strand out file for stranded data")
     parser_manipulate.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
@@ -1170,7 +1385,7 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth' 'scale_byfactor'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'scale_byfactor', 'downsample'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -1238,7 +1453,7 @@ if __name__ == "__main__":
             can be NA before reporting the value as NA? default = 0.25", default = 0.25)
     parser_query.add_argument('--summary_func', type = str, help = "What function to use to summarize data when not using \
             'identity' summary. mean, median, max, min supported. Additionally, traveling ratio ('TR') and relative polymerase progression ('RPP'), \
-            traveling ratio A window ('TR_A'), traveling ratio B window ('TR_B'),  and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
+            traveling ratio A window ('TR_A'), traveling ratio B window ('TR_B'),  Gini coefficient ('Gini') and 'summit_loc' (local peak identification) are supported. Default = 'mean'", default = "mean")
     parser_query.add_argument('--gzip', action = "store_true", help = "gzips the output if flag is included")
     parser_query.add_argument('--TR_A_center', type = int, help = "center of window A in fixed traveling ratio. In relative bp to region start")
     parser_query.add_argument('--wsize', type = int, default = 50, help = "Size of half window in bp for calcs that use windows. Default = 50 bp")
@@ -1301,6 +1516,7 @@ if __name__ == "__main__":
             should be set no lower than the resolution of the input file")
     parser_normfactor.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output bigwig")
+    parser_normfactor.add_argument("--antisense", action = "store_true", help = "Use antisense instead of sense values for each expected region")
     parser_normfactor.set_defaults(func=normfactor_main)
 
     
