@@ -706,10 +706,10 @@ def single_num_summary(arrays, function, contigs = None, expected_locs = None, r
         inbed.from_bed_file(expected_locs)
         for region in inbed:
             this_chrm = region["chrm"]
-            array_len = len(sample_array[this_chrm])
+            array_len = len(arrays[this_chrm])
             left_coord = max(region["start"] - args.upstream, 0)
             right_coord = min(region["end"] + args.downstream, array_len * res)
-            out_array.append(sample_array[this_chrm][left_coord//res:right_coord//res])
+            out_array.append(arrays[this_chrm][left_coord//res:right_coord//res])
         out_array = np.concatenate(out_array) 
     else:
         out_array = np.zeros(np.sum([arrays[chrm].size for chrm in contigs]), float)

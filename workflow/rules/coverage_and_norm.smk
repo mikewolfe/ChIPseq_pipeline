@@ -21,20 +21,22 @@ rule run_coverage_and_norm:
         ending = ENDING)
 
 
-def determine_spike_norm_files(config, pep):
+def determine_group_norm_files(config, pep):
     outfiles = []
-    models = lookup_in_config(config, ["coverage_and_norm", "spike_norm"], "")
+    models = lookup_in_config(config, ["coverage_and_norm", "group_norm"], "")
     for model in models: 
         these_samples = filter_samples(pep, \
-            lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "filter"], "not input_sample.isnull()"))
-        for norm_type in lookup_in_config(config, ["coverage_and_norm", "spike_norm", model, "methods"], []):
-            outfiles.extend(["results/coverage_and_norm/spike_norm/%s/%s_%s.bw"%(model, sample, norm_type) for sample in these_samples]) 
+            lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "filter"], "not input_sample.isnull()"))
+        for norm_type in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "methods"], []):
+            outfiles.extend(["results/coverage_and_norm/group_norm/%s/%s_%s.bw"%(model, sample, norm_type) for sample in these_samples]) 
+        for dwnsample in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "dwnsample"], []):
+            outfiles.extend(["results/coverage_and_norm/group_norm/%s/dwnsample/%s_%s.bw"%(model, sample, dwnsample) for sample in these_samples]) 
 
     return outfiles
 
-rule run_spike_norm:
+rule run_group_norm:
     input:       
-        determine_spike_norm_files(config, pep)
+        determine_group_norm_files(config, pep)
 
 rule get_raw_coverage:
     input:
@@ -606,10 +608,10 @@ rule run_bwtools_multicompare:
         determine_multicompare_models(config)
 
 
-def pull_bws_for_spike_norm_models(modelname, config, pep, ext_or_inp = "ext"):
+def pull_bws_for_group_norm_models(modelname, config, pep, ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
-    file_sig = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filesignature"],\
+    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not input_sample.isnull()"))
+    file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
 
     if ext_or_inp == "ext":
@@ -619,39 +621,39 @@ def pull_bws_for_spike_norm_models(modelname, config, pep, ext_or_inp = "ext"):
 
     return files
 
-def pull_labels_for_spike_norm_models(modelname, config, pep):
+def pull_labels_for_group_norm_models(modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not input_sample.isnull()"))
     return " ".join(these_samples)
 
-def pull_expected_regions_spike_norm_models(modelname, config, pep):
-    spikeregions = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "regions"], "")
+def pull_expected_regions_group_norm_models(modelname, config, pep):
+    spikeregions = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "regions"], "")
     if spikeregions is not "":
         out = "--expected_regions %s"%(spikeregions)
     else:
         out = ""
     return out
 
-rule spike_norm_table:
+rule group_norm_table:
     input:
-        inextbws= lambda wildcards: pull_bws_for_spike_norm_models(wildcards.model,config, pep, ext_or_inp = "ext"),
-        ininpbws= lambda wildcards: pull_bws_for_spike_norm_models(wildcards.model,config, pep, ext_or_inp = "inp"),
-        inbed= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "regions"], "config/config.yaml"),
+        inextbws= lambda wildcards: pull_bws_for_group_norm_models(wildcards.model,config, pep, ext_or_inp = "ext"),
+        ininpbws= lambda wildcards: pull_bws_for_group_norm_models(wildcards.model,config, pep, ext_or_inp = "inp"),
+        inbed= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "regions"], "config/config.yaml"),
         fragtable = "results/quality_control/frags_per_contig/all_samples.tsv",
-        md= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "metadata"], None),
+        md= lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "metadata"], None),
     output:
-        outtext="results/coverage_and_norm/spike_norm/{model}/{model}_scale_factors.tsv"
+        outtext="results/coverage_and_norm/group_norm/{model}/{model}_scale_factors.tsv"
     log:
-        stdout="results/coverage_and_norm/logs/spike_norm/{model}/scale_factors.log",
-        stderr="results/coverage_and_norm/logs/spike_norm/{model}/scale_factors.err"
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/scale_factors.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/scale_factors.err"
     params:
-        labels = lambda wildcards: pull_labels_for_spike_norm_models(wildcards.model, config, pep),
-        pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1),
-        spikecontigs = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "spikecontigs"], None),
-        spikeregions = lambda wildcards: pull_expected_regions_spike_norm_models(wildcards.model, config, pep),
+        labels = lambda wildcards: pull_labels_for_group_norm_models(wildcards.model, config, pep),
+        pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "pseudocount"], 0.1),
+        spikecontigs = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "spikecontigs"], None),
+        spikeregions = lambda wildcards: pull_expected_regions_group_norm_models(wildcards.model, config, pep),
         res = RES,
-        upstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "upstream"], 0),
-        downstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "downstream"], 0)
+        upstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "upstream"], 0),
+        downstream = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "downstream"], 0)
     threads:
         5
     conda:
@@ -674,25 +676,25 @@ rule spike_norm_table:
 
 
 def get_sample_for_scale_byfactor(modelname, sample, config, pep): 
-    file_sig = lookup_in_config(config, ["coverage_and_norm", "spike_norm", modelname, "filesignature"],\
+    file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
     return file_sig%(sample)
 
 rule bwtools_scale_byfactor:
     input:
         infile = lambda wildcards: get_sample_for_scale_byfactor(wildcards.model, wildcards.sample, config, pep),
-        sf_tab="results/coverage_and_norm/spike_norm/{model}/{model}_scale_factors.tsv"
+        sf_tab="results/coverage_and_norm/group_norm/{model}/{model}_scale_factors.tsv"
     output:
-        "results/coverage_and_norm/spike_norm/{model}/{sample}_{norm}.bw"
+        "results/coverage_and_norm/group_norm/{model}/{sample}_{norm}.bw"
     params:
         resolution = RES,
         dropNaNsandInfs = determine_dropNaNsandInfs(config),
-        pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "spike_norm", wildcards.model, "pseudocount"], 0.1)
+        pseudocount = lambda wildcards: lookup_in_config(config, ["coverage_and_norm", "group_norm", wildcards.model, "pseudocount"], 0.1)
     wildcard_constraints:
         norm="total_frag_sfs|spike_frag_sfs|nonspike_frag_sfs|deseq2_sfs|deseq2_spike_sfs|regress_rpm_sfs|regress_total_rpm_sfs|regress_spike_rpm_sfs|tmm_rpm_sfs|tmm_spike_rpm_sfs"
     log:
-        stdout="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.log",
-        stderr="results/coverage_and_norm/logs/spike_norm/{model}/{sample}_{norm}.err"
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/{sample}_{norm}.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/{sample}_{norm}.err"
     conda:
         "../envs/coverage_and_norm.yaml"
     shell:
@@ -701,6 +703,34 @@ rule bwtools_scale_byfactor:
        "{input.infile} {output} "
        "--res {params.resolution} --operation scale_byfactor "
        "--pseudocount {params.pseudocount} "
+       "--scalefactor_table {input.sf_tab} "
+       "--scalefactor_id {wildcards.sample} {wildcards.norm} "
+       "{params.dropNaNsandInfs} "
+       "> {log.stdout} 2> {log.stderr}"
+
+rule bwtools_dwnsample:
+    input:
+        inplus = lambda wildcards: get_sample_for_scale_byfactor(wildcards.model, wildcards.sample, config, pep),
+        sf_tab="results/coverage_and_norm/group_norm/{model}/{model}_scale_factors.tsv"
+    output:
+        outplus="results/coverage_and_norm/group_norm/{model}/dwnsample/{sample}_plus_{norm}.bw",
+        outminus="results/coverage_and_norm/group_norm/{model}/dwnsample/{sample}_minus_{norm}.bw"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    wildcard_constraints:
+        norm="total_frag|spike_frag|nonspike_frag"
+    log:
+        stdout="results/coverage_and_norm/logs/group_norm/{model}/dwnsample/{sample}_{norm}.log",
+        stderr="results/coverage_and_norm/logs/group_norm/{model}/dwnsample/{sample}_{norm}.err"
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+       "python3 "
+       "workflow/scripts/bwtools.py manipulate "
+       "{input.inplus} {output.outplus} "
+       "--minus_strand {input.inminus} --minus_strand_out {output.outminus} "
+       "--res {params.resolution} --operation downsample "
        "--scalefactor_table {input.sf_tab} "
        "--scalefactor_id {wildcards.sample} {wildcards.norm} "
        "{params.dropNaNsandInfs} "

@@ -1,5 +1,5 @@
 # control of the pipeline
-configfile: "config/config.yaml"
+configfile: "config/simulated_config.yaml"
 # sample metadata and information
 pepfile: "pep/config.yaml"
 
@@ -166,6 +166,7 @@ include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/motif_calling.smk"
 include: "workflow/rules/assembly.smk"
+include: "workflow/rules/test.smk"
 
 
 

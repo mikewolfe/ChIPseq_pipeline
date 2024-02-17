@@ -99,7 +99,7 @@ coverage_and_norm:
     # revamped spike-in normalization using a model-based approach
 
     # summarizes values by region
-    spike_norm:
+    group_norm:
         # Can specify different "models" to run by naming them here
         # Model 1 - look at the full coverage for all genes
         all_samples:
