@@ -14,12 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Deduplication with Picard MarkDuplicates.
 - Ability to get A and B average counts for the traveling ratio
 - Remove default max size for traveling ratio calculations
+- Ability to simulate ChIP-seq like traces for testing
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around
   rate filtering issue and multiqc to deal with python updates
 - Remove arbitrary gene length cutoff for traveling ratios
 - Enable window size to be changed for traveling ratios
+- Update to `bwtools` to do group-based normalization
 
 ### Bug fixes
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input

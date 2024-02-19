@@ -1,5 +1,5 @@
 # control of the pipeline
-configfile: "config/simulated_config.yaml"
+configfile: "config/config.yaml"
 # sample metadata and information
 pepfile: "pep/config.yaml"
 
