@@ -19,6 +19,17 @@ def qc_groups(config, pep):
     column = determine_grouping_category(config)
     return pep.sample_table[column].unique().tolist()
 
+
+def fastqc_files_output(pep, type_string = "processed"):
+    out = []
+    for sample in samples(pep):
+        if determine_single_end(sample, pep):
+            out.append("results/quality_control/fastqc_%s/%s_%s_R0_fastqc.html"%(type_string, sample, type_string))
+        else:
+            out.append("results/quality_control/fastqc_%s/%s_%s_R1_fastqc.html"%(type_string, sample, type_string))
+            out.append("results/quality_control/fastqc_%s/%s_%s_R2_fastqc.html"%(type_string,sample, type_string))
+    return out
+
 def determine_qc_to_run(config, pep):
     out = []
     groups = qc_groups(config, pep)
@@ -93,15 +104,6 @@ rule combine_frags_per_contig:
 
 
 # General read QC
-def fastqc_files_output(pep, type_string = "processed"):
-    out = []
-    for sample in samples(pep):
-        if determine_single_end(sample, pep):
-            out.append("results/quality_control/fastqc_%s/%s_%s_R0_fastqc.html"%(type_string, sample, type_string))
-        else:
-            out.append("results/quality_control/fastqc_%s/%s_%s_R1_fastqc.html"%(type_string, sample, type_string))
-            out.append("results/quality_control/fastqc_%s/%s_%s_R2_fastqc.html"%(type_string,sample, type_string))
-    return out
 
 rule read_qc:
     input:
