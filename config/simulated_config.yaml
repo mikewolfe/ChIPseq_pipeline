@@ -1,0 +1,182 @@
+---
+# Configuration file for running ChIP-seq workflow
+# This controls parameters for creating sampled test sets
+test:
+    sample_fastqs:
+        sample_param_string: 
+            column: "simulation_params"
+
+# Here is where the reference genomes are specified
+reference:
+    U00096.3_AL009126.3:
+        # location of the genbanks. If put in the location and format shown
+        # below the pipeline will attempt to pull this file from NCBI by
+        # accession number. Each genbank MUST have a associated name which
+        # is used to name the contig pulled from it.
+        genbanks: 
+            U00096.3: resources/genbanks/U00096.3.gbk
+            AL009126.3: resources/genbanks/AL009126.3.gbk
+        # This is the fasta file for each chromosome in the genome
+        # If specified location then it is automatically parsed
+        # from the genbank.
+        fastas:
+            - results/alignment/process_genbank/U00096.3_AL009126.3/U00096.3.fna
+            - results/alignment/process_genbank/U00096.3_AL009126.3/AL009126.3.fna
+
+# Options to control preprocessing rules
+preprocessing:
+    # GENERAL PARADIGM FOR CONTROLLING THINGS FOR ALL SAMPLES OR SPECIFICALLY
+    # FOR EACH SAMPLE INDIVIDUALLY
+    # Example: 
+    # Control the parameter string passed to cutadapt. Here you could change
+    # the adaptor sequences for every sample by using 
+    # cut_param_string:
+    #   value: "my string here"
+    # or by sample by using :
+    # cut_param_string: 
+    #   column: cutadapt_params
+    # and specifying the name of the column in the
+    # sample sheet that holds the strings you want to for each sample. In this
+    # example it would be the column cutadapt_params that holds a string for
+    # each sample.
+    #
+    # This same paradigm is used for all option that have a value or column
+    # specifier
+    cutadapt_pe:
+        cut_param_string:
+            value: "-a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+    # Control the parameter string from trimmomatic
+    trimmomatic_pe:
+        trim_param_string:
+            value: "LEADING:3 TRAILING:3 SLIDINGWINDOW:4:15"
+
+# Options to control alignment rules
+alignment:
+    process_genbank:
+        # Control what features are parsed from the genbank when pulling out
+        # bed files
+        features:
+            value: "CDS tRNA rRNA ncRNA"
+        qual_name: 
+            value: "gene locus_tag"
+    bowtie2_map:
+        # controls how bowtie2 does its alignments
+        bowtie2_param_string:
+            value: "--end-to-end --very-sensitive --phred33"
+        # controls samtools filtering as reads come out of bowtie2. Default
+        # is to just convert the sam records into a bam with -b
+        samtools_view_param_string:
+            value: "-b"
+
+    bowtie2_map_se:
+        # controls how bowtie2 does its alignments for single end data
+        bowtie2_param_string:
+            value: "--end-to-end --very-sensitive --phred33"
+        # controls samtools filtering as reads come out of bowtie2. Default
+        # is to just convert the sam records into a bam with -b
+        samtools_view_param_string:
+            value: "-b"
+
+
+# Options to control genome coverage calculations
+coverage_and_norm:
+
+    # what resolution in bp do you want the coverage to be calculated?
+    resolution: 5
+    
+    # revamped spike-in normalization using a model-based approach
+    group_norm:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_samples:
+            metadata: "pep/simulated_test.csv"
+            pseudocount: 0.1
+            spikecontigs: "AL009126.3"
+            filter: 'not input_sample.isnull()'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/process_genbank/U00096.3_AL009126.3/AL009126.3.bed"
+            upstream: 20
+            downstream: 20
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "regress_total_rpm_sfs","tmm_rpm_sfs", "tmm_spike_rpm_sfs"]
+
+        all_samples_no_expected:
+            metadata: "pep/simulated_test.csv"
+            pseudocount: 0.1
+            spikecontigs: "AL009126.3"
+            filter: 'not input_sample.isnull()'
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "regress_rpm_sfs", "regress_total_rpm_sfs", "regress_spike_rpm_sfs"]
+
+
+    deeptools_coverage:
+        bamCoverage_param_string:
+            # Rather than set this for all samples
+            #value: "--samFlagInclude 67 --extendReads"
+            # We will instead set it for each sample by specifying a column
+            value: "--samFlagInclude 67 --extendReads"
+
+# Options to control quality control
+quality_control:
+    # what column to group samples by for ChIP-QC output plots?
+    group_by: genome
+    frags_per_contig:
+        samtools_param_string:
+            value: "-f 67"
+
+
+
+# Control for the postprocessing submodule
+postprocessing:
+    # summarizes values by region
+    bwtools_query:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_genes_cov:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/process_genbank/U00096.3_AL009126.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/group_norm/all_samples/%s_regress_rpm_sfs.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # Specify how you want the coordinates to be reported in. Options
+            # include "relative_start", "relative_end", "relative_center" and
+            # "absolute". Default is "absolute"
+            coord: "relative_start"
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+
+        # Model 2 - look at the coverage for all genes as a mean summary
+        all_genes_mean:
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3_AL009126.3/U00096.3.bed"
+            # which files to use? Note we can use a different set than Model 1
+            filesignature: "results/coverage_and_norm/group_norm/all_samples/%s_regress_rpm_sfs.bw"
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file, think of this as a sampling rate, no 
+            # averaging is done over the bins)
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min,
+            # etc.)
+            # only defined when summarize is "single"
+            summary_func: "mean"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
