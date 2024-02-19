@@ -8,18 +8,52 @@ rule clean_quality_control:
         "rm -fr results/quality_control/"
 
 # Rule to create everything
+def determine_grouping_category(config):
+    if "quality_control" in config and "group_by" in config["quality_control"]:
+        grouping_category = config["quality_control"]["group_by"]
+    else:
+        grouping_category = "genome"
+    return grouping_category
+
+def qc_groups(config, pep):
+    column = determine_grouping_category(config)
+    return pep.sample_table[column].unique().tolist()
+
+def determine_qc_to_run(config, pep):
+    out = []
+    groups = qc_groups(config, pep)
+    which_qc = lookup_in_config(config, ["quality_control", "qc_to_run"], ["correlation", "pe_fragment", "coverage", "fastqc"])
+    # generate coverage files
+    fingerprint = ["results/quality_control/deeptools_QC/fingerprint/%s_fingerprint.png"%(group) for group in groups]
+    coverage = ["results/quality_control/deeptools_QC/plotCoverage/%s_plotCoverage.png"%(group) for group in groups]
+    # generate correlation files
+    cor_scatter = ["results/quality_control/deeptools_QC/corScatter/%s_corScatterplot.png"%(group) for group in groups]
+    cor_heatmap = ["results/quality_control/deeptools_QC/corHeatmap/%s_corHeatmap.png"%(group) for group in groups]
+    PCA = ["results/quality_control/deeptools_QC/PCA/%s_plotPCA.png"%(group) for group in groups]
+    # generate fragment distributions
+    if "pe_fragment" in which_qc:
+        if "filenameR2" in pep.sample_table:
+            out += ["results/quality_control/deeptools_QC/fragment_sizes/bamPEFragmentSize.png"] 
+        else:
+            logger.warning("No PE samples. Not running bamPEFragmentSize QC")
+    if "coverage" in which_qc:
+        out += fingerprint + coverage
+    if "correlation" in which_qc:
+        out += cor_scatter + cor_heatmap + PCA
+    if "fastqc" in which_qc:
+        out += fastqc_files_output(pep, "processed")
+        out += fastqc_files_output(pep, "raw")
+    return out
+
 rule run_quality_control:
     input:
-        "results/quality_control/read_qc.done",
-        "results/quality_control/ChIP_qc.done",
-        "results/quality_control/frags_per_contig/all_samples.tsv"
+        determine_qc_to_run(config, pep)
     output:
         "results/quality_control/multiqc_report.html"
     conda:
         "../envs/quality_control.yaml"
     shell:
         "multiqc results/ -o results/quality_control/ --config workflow/envs/multiqc_config.yaml"
-
 
 ## spike-in QC
 
@@ -126,22 +160,11 @@ rule fastqc_processed:
 
 # ChIP QC will be done by groups thus we need to write a few helpers
 
-def determine_grouping_category(config):
-    if "quality_control" in config and "group_by" in config["quality_control"]:
-        grouping_category = config["quality_control"]["group_by"]
-    else:
-        grouping_category = "genome"
-    return grouping_category
-
 def get_sample_by_group(group, pep):
     samp_table = pep.sample_table
     grouping_category = determine_grouping_category(config)
     samples = samp_table.loc[samp_table[grouping_category] == group, "sample_name"]
     return samples.tolist()
-
-def qc_groups(config, pep):
-    column = determine_grouping_category(config)
-    return pep.sample_table[column].unique().tolist()
 
 def get_pe_samples(pep):
     return filter_samples(pep, "not filenameR2.isnull()")

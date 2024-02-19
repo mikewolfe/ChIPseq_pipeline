@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ability to get A and B average counts for the traveling ratio
 - Remove default max size for traveling ratio calculations
 - Ability to simulate ChIP-seq like traces for testing
+- Choose which quality control modules to run
 
 ### Changes
 - Update versions of some packages including ncbi-acc-download to get around

@@ -274,11 +274,29 @@ coverage_and_norm:
 
 # Options to control quality control
 quality_control:
+    qc_to_run:
+        - "fastqc"
+        - "coverage"
+        - "correlation"
+        - "pe_fragment"
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
-    frags_per_contig:
-        samtools_param_string:
-            column: "samtools_params"
+    # control how reads are filter for ALL samples
+    bamCoverage_params: " " 
+    # Determine sampling parameters for fingerprint plots. These are good
+    # defaults for E. coli
+    plotFingerprint:
+        binsize: 500
+        num_samps: 9200
+    # Determine bin size for coverage calcs. This controls PCA and correlation
+    # as well
+    multiBamSummary:
+        binsize: 1000
+    # Determine sampling parameters for coverage calculations
+    plotCoverage:
+        num_samps: 1000
+    bamPEFragSize:
+        bin_dist: 10000
 
 
 
