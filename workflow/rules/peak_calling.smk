@@ -173,6 +173,7 @@ rule peak_coverage:
     params:
         upstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "upstream"], 0),
         downstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "downstream"], 0),
+        coords = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "coords"], "relative_start"),
         res = RES
     threads:
         5
@@ -186,6 +187,7 @@ rule peak_coverage:
         "--regions {input.regions} "
         "--upstream {params.upstream} "
         "--downstream {params.downstream} "
+        "--coords {params.coords} "
         "--samp_names {wildcards.sample} "
         "--summarize identity "
         "--gzip "

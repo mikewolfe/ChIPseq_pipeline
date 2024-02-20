@@ -27,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Bug fixes
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input
   files
+- Issues with macs2 peak calling version
 
 
 ## 0.3.0 - 2023-07-15
