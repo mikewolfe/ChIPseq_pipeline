@@ -1114,6 +1114,23 @@ def normfactor_main(args):
         overall = overall.merge(spike_frag_sf_column, on = 'sample_name', how = 'left')
         overall = overall.merge(nonspike_frag_sf_column, on = 'sample_name', how = 'left')
 
+        # get the change in the fraction of spike-in fragments from ext to inp
+        diff_in_spike_values = []
+        for sample in args.samples:
+            diff_in_spike_values.append(np.power(2, np.log2(\
+                    overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/ \
+                    overall.loc[overall["sample_name"] == sample, "total_frag"].values[0])- \
+                    np.log2( \
+                    overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0], "spike_frag"].values[0]/\
+                    overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0], "total_frag"].values[0])))
+
+        diff_in_spike = pd.DataFrame(data = {'diff_spike_sfs': diff_in_spike_values, 'sample_name': args.samples})
+        overall = overall.merge(diff_in_spike, on = 'sample_name', how = 'left')
+        diff_in_spike_rpm = pd.DataFrame(data = {'diff_spike_rpm_sfs': overall["diff_spike_sfs"]*overall["total_frag_sfs"],\
+                'sample_name': overall['sample_name']})
+
+        overall = overall.merge(diff_in_spike_rpm, on = 'sample_name', how = 'left')
+
     # DEseq2 size factors
     # stranded version
     if args.ext_bws_minus is not None:
@@ -1281,6 +1298,10 @@ def normfactor_main(args):
             inp_minus_bw_arrays = convert_bigwigs_to_arrays(inp_minus_bw_handles, res = args.res)
             regress_resids = []
             regress_rpm = []
+
+            regress_total = []
+            regress_total_rpm = []
+
             for ext_array_plus, ext_array_minus, inp_array_plus, inp_array_minus, sample in zip(bw_plus_arrays, bw_minus_arrays, inp_plus_bw_arrays, inp_minus_bw_arrays, args.samples):
                 regress_resids.append(get_stranded_regression_estimates(\
                         scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/1e6, args.pseudocount),\
@@ -1291,16 +1312,39 @@ def normfactor_main(args):
                         args.expected_regions,
                         args.res,
                         antisense = args.antisense))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+
+
+                regress_total.append(get_stranded_regression_estimates(\
+                        scale_array(ext_array_plus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(ext_array_minus, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(inp_array_plus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                        scale_array(inp_array_minus, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
+                        args.spikecontigs,
+                        args.expected_regions,
+                        args.res,
+                        antisense = args.antisense))
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples}) 
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})   
             lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled/np.mean(lib_scaled), 'sample_name': args.samples})
-    
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+
             overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
+
+
+            regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples}) 
+            regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name': args.samples})   
+            lib_total_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
+            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': lib_total_scaled, 'sample_name': args.samples})
+
+            overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
+            overall = overall.merge(regress_total_rpm_sfs, on = 'sample_name', how = 'left')
+    
         # unstranded version
         else:
             inp_bw_handles = open_multiple_bigwigs(args.inp_bws)
@@ -1321,8 +1365,8 @@ def normfactor_main(args):
                         args.res,
                         args.upstream,
                         args.downstream))
-                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag"].values[0])
-                regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0])
+                regress_rpm.append(overall.loc[overall["sample_name"] == sample, "nonspike_frag_sfs"].values[0])
+                regress_spike_rpm.append(overall.loc[overall["sample_name"] == sample, "spike_frag_sfs"].values[0])
 
                 regress_total.append(get_regression_estimates(scale_array(ext_array, overall.loc[overall["sample_name"] == sample, "total_frag"].values[0]/1e6, args.pseudocount),\
                         scale_array(inp_array, overall.loc[overall["sample_name"] == md.loc[md["sample_name"] == sample, "input_sample"].values[0],"total_frag"].values[0]/1e6, args.pseudocount),\
@@ -1331,24 +1375,24 @@ def normfactor_main(args):
                         args.res,
                         args.upstream,
                         args.downstream))
-                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag"].values[0])
+                regress_total_rpm.append(overall.loc[overall["sample_name"] == sample, "total_frag_sfs"].values[0])
 
             regress_column = pd.DataFrame(data = {'regress_resids': regress_resids, 'sample_name':args.samples})
             regress_sfs = pd.DataFrame(data = {'regress_sfs': regress_resids/np.mean(regress_resids), 'sample_name': args.samples})    
             lib_scaled = (regress_resids/np.mean(regress_resids))*regress_rpm
-            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': (lib_scaled/np.mean(lib_scaled)), 'sample_name': args.samples})
-            spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
-            regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
+            regress_rpm_sfs = pd.DataFrame(data = {'regress_rpm_sfs': lib_scaled, 'sample_name': args.samples})
+            #spike_lib_scaled = (regress_resids/np.mean(regress_resids))*regress_spike_rpm
+            #regress_spike_rpm_sfs = pd.DataFrame(data = {'regress_spike_rpm_sfs': spike_lib_scaled/np.mean(spike_lib_scaled), 'sample_name': args.samples})
 
             regress_total_column = pd.DataFrame(data = {'regress_total_resids': regress_total, 'sample_name':args.samples})
             regress_total_sfs = pd.DataFrame(data = {'regress_total_sfs': regress_total/np.mean(regress_total), 'sample_name':args.samples})
             total_lib_scaled = (regress_total/np.mean(regress_total))*regress_total_rpm
-            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled/np.mean(total_lib_scaled), 'sample_name': args.samples})
+            regress_total_rpm_sfs = pd.DataFrame(data = {'regress_total_rpm_sfs': total_lib_scaled, 'sample_name': args.samples})
             
             overall = overall.merge(regress_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_sfs, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_rpm_sfs, on = 'sample_name', how = 'left')
-            overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
+            #overall = overall.merge(regress_spike_rpm_sfs, on = 'sample_name', how = 'left')
 
             overall = overall.merge(regress_total_column, on = 'sample_name', how = 'left')
             overall = overall.merge(regress_total_sfs, on = 'sample_name', how = 'left')
