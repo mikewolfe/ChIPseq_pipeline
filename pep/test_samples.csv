@@ -6,5 +6,5 @@ genotypeA_rep2_inp,genotypeA_rep2_inp_R1.fastq.gz,genotypeA_rep2_inp_R2.fastq.gz
 genotypeB_rep1_ext,genotypeB_rep1_ext_R1.fastq.gz,genotypeB_rep1_ext_R2.fastq.gz,source1,genotypeB_rep1_inp,B,U00096.3,--samFlagInclude 67 --samFlagExclude 1024 --extendReads,-f BAMPE,-f 67 -F 1024
 genotypeB_rep2_ext,genotypeB_rep2_ext_R1.fastq.gz,genotypeB_rep2_ext_R2.fastq.gz,source1,genotypeB_rep2_inp,B,U00096.3,--samFlagInclude 67 --samFlagExclude 1024 --extendReads,-f BAMPE,-f 67 -F 1024
 genotypeB_rep1_inp,genotypeB_rep1_inp_R1.fastq.gz,genotypeB_rep1_inp_R2.fastq.gz,source1,,B,U00096.3,--samFlagInclude 67 --samFlagExclude 1024 --extendReads,,-f 67 -F 1024
-genotypeB_rep2_inp,genotypeB_rep2_inp_R1.fastq.gz,genotypeB_rep2_inp_R2.fastq.gz,source1,,B,U00096.3,--samFlagInclude 67 --samFlagExclude 1024 --extendReads,,-f 67 -F 1024
+genotypeB_rep2_inp,genotypeB_rep2_inp_R1.fastq.gz;genotypeB_rep2_inp_R1.fastq.gz,genotypeB_rep2_inp_R2.fastq.gz;genotypeB_rep2_inp_R2.fastq.gz,source1,,B,U00096.3,--samFlagInclude 67 --samFlagExclude 1024 --extendReads,,-f 67 -F 1024
 genotypeA_rep2_ext_se,genotypeA_rep2_ext_R1.fastq.gz,,source1,genotypeA_rep2_inp,A,U00096.3,--samFlagExclude 1024,-f BAM,-F 1028

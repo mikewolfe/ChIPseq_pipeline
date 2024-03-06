@@ -18,14 +18,32 @@ def lookup_sample_metadata(sample, key, pep):
         raise KeyError("Sample %s not in sample table"%sample)
     return pep.sample_table.at[sample, key]
 
-def match_fastq_to_sample(sample, pair, pep):
-    out = lookup_sample_metadata(sample, "file_path", pep)
+def determine_fastqs_to_combine(sample, pair, pep):
+    path = lookup_sample_metadata(sample, "file_path", pep)
     if pair == "R1" or pair == "R0":
-        out += lookup_sample_metadata(sample, "filenameR1", pep)
+        file_list = lookup_sample_metadata(sample, "filenameR1", pep)
     elif pair == "R2":
-        out += lookup_sample_metadata(sample, "filenameR2", pep)
+        file_list = lookup_sample_metadata(sample, "filenameR2", pep)
     else:
         raise ValueError("Pair must be R0 (single-end), R1, or R2 not %s"%pair)
+    out = []
+    for this_file in file_list.split(";"):
+        out.append(path + this_file)
+    return out
+        
+
+def match_fastq_to_sample(sample, pair, pep):
+    path = lookup_sample_metadata(sample, "file_path", pep)
+    if pair == "R1" or pair == "R0":
+        file_list = lookup_sample_metadata(sample, "filenameR1", pep)
+    elif pair == "R2":
+        file_list = lookup_sample_metadata(sample, "filenameR2", pep)
+    else:
+        raise ValueError("Pair must be R0 (single-end), R1, or R2 not %s"%pair)
+    if len(file_list.split(";")) > 1:
+        out = "results/preprocessing/combine_fastq/" + sample + "_" + pair + "_combined.fastq.gz"
+    else:
+        out = path + file_list
     return out
 
 def determine_single_end(sample, pep):
