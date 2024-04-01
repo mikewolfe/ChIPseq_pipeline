@@ -20,6 +20,18 @@ rule run_preprocessing:
     input:
         trimmed_files(pep)
 
+rule combine_fastq:
+    input:
+        lambda wildcards: determine_fastqs_to_combine(wildcards.sample, wildcards.read_num, pep)
+    output:
+        temp("results/preprocessing/combine_fastq/{sample}_{read_num}_combined.fastq.gz")
+    log:
+        stderr="results/preprocessing/logs/combine_fastq/{sample}_{read_num}_combined.err"
+    threads: 1
+    shell:
+        "zcat {input} | gzip > {output} 2> {log.stderr}"
+
+
 rule cutadapt_se:
     input:
         in1=lambda wildcards: match_fastq_to_sample(wildcards.sample, 'R0', pep),
