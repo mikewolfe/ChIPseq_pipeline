@@ -115,7 +115,7 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
 
-def smooth(arrays, wsize, kernel_type, edge, sigma = None):
+def smooth(arrays, wsize, kernel_type, edge, sigma = None, min_max = False):
     """
     Smooth data using a convolution with a kernel (flat or gaussian).
 
@@ -130,9 +130,11 @@ def smooth(arrays, wsize, kernel_type, edge, sigma = None):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge, sigma)
+        if min_max:
+            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
     return arrays
 
-def savgol(arrays, wsize, polyorder, edge):
+def savgol(arrays, wsize, polyorder, edge, min_max = False):
     """
     Smooth data using a Savtizky-Golay filter
 
@@ -149,6 +151,8 @@ def savgol(arrays, wsize, polyorder, edge):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.savgol_1D(arrays[chrm], wsize, polyorder=polyorder, edge=edge)
+        if min_max:
+            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
     return arrays
 
 
@@ -259,9 +263,9 @@ def manipulate_main(args):
             "query_scale": lambda x: scale_region_max(x, args.number_of_regions, args.query_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
-            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma),
-            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge),
-            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge),
+            "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma, min_max = args.smooth_minmax),
+            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, min_max = args.smooth_minmax),
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, min_max = args.smooth_minmax),
             "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
     # Extra logic if trying to downsample everything which requires both strands
@@ -1117,6 +1121,7 @@ def normfactor_main(args):
         # get the change in the fraction of spike-in fragments from ext to inp
         diff_in_spike_values = []
         for sample in args.samples:
+            #print(overall.loc[overall["sample_name"] == sample, "spike_frag"], sample)
             diff_in_spike_values.append(np.power(2, np.log2(\
                     overall.loc[overall["sample_name"] == sample, "spike_frag"].values[0]/ \
                     overall.loc[overall["sample_name"] == sample, "total_frag"].values[0])- \
@@ -1459,6 +1464,8 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
+    parser_manipulate.add_argument('--smooth_minmax', action = "store_true",
+            help = "Put the smoothed signal on a 0-1 scale?")
     parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
             help = "A table of scale factors for scale_byfactor")
     parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,

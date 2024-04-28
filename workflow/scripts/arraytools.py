@@ -165,6 +165,19 @@ def savgol_1D(array, wsize, polyorder=5, deriv=0, delta = 1.0, edge = "mirror"):
         raise ValueError("polyorder shouldn't be larger than window. Window %s, polyorder %s"%(tot_size, polyorder))
     return signal.savgol_filter(array, tot_size, polyorder, deriv, delta, mode = edge)
 
+
+def min_max_1D(array):
+    """
+    Function to scale a 1D signal to a 0,1 scale
+
+    Args:
+        array - 1 dimensional numpy array
+    Returns:
+        outarray - min maxed array of the same size
+
+    """
+    return (array - np.nanmin(array))/(np.nanmax(array) - np.nanmin(array))
+
 def weighted_center(array, only_finite = True, normalize = False):
     """
     Find the weighted center of a 1D array

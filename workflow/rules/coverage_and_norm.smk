@@ -542,6 +542,33 @@ rule bwtools_ratio:
         "{params.dropNaNsandInfs} "
         "> {log.stdout} 2> {log.stderr}"
 
+
+rule bwtools_inpcqt:
+    input:
+        ext = "results/coverage_and_norm/deeptools_coverage/{sample}_{norm}.bw",
+        inp = lambda wildcards: "results/coverage_and_norm/bwtools_smooth/%s_smooth.bw"%(lookup_sample_metadata(wildcards.sample, "input_sample", pep))
+    output:
+        "results/coverage_and_norm/bwtools_compare/{sample}_{norm}_inpcqt.bw"
+    wildcard_constraints:
+        norm = "raw|RPKM|CPM|BPM|RPGC|median|spike"
+    params:
+        resolution = RES,
+        dropNaNsandInfs = determine_dropNaNsandInfs(config)
+    log:
+        stdout="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_inpcqt.log",
+        stderr="results/coverage_and_norm/logs/bwtools_compare/{sample}_{norm}_inpcqt.err"
+    threads:
+        1
+    conda:
+        "../envs/coverage_and_norm.yaml"
+    shell:
+        "python3 "
+        "workflow/scripts/bwtools.py compare {input.ext} {input.inp} {output} "
+        "--operation 'divide' "
+        "--res {params.resolution} "
+        "{params.dropNaNsandInfs} "
+        "> {log.stdout} 2> {log.stderr}"
+
 def pull_bws_for_bwtools_multicompare(modelname, config, pep):
     groupA_samples = filter_samples(pep, \
     lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_groupA']))
@@ -611,8 +638,7 @@ rule run_bwtools_multicompare:
 def pull_bws_for_group_norm_models(modelname, config, pep, ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
     lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not input_sample.isnull()"))
-    file_sig = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filesignature"],\
-    "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
+    file_sig = "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
 
     if ext_or_inp == "ext":
         files = [file_sig%(sample) for sample in these_samples]

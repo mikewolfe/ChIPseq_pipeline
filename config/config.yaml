@@ -116,8 +116,8 @@ coverage_and_norm:
             downstream: 20
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
-            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs", "tmm_sfs", "tmm_spike_sfs"]
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_raw_inpcqt.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs"]
 
         all_samples_no_expected:
             metadata: "pep/test_samples.csv"
@@ -127,8 +127,8 @@ coverage_and_norm:
             filter: 'not input_sample.isnull()'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
-            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
-            methods: ["total_frag_sfs", "spike_frag_sfs", "regress_rpm_sfs", "regress_total_rpm_sfs", "regress_spike_rpm_sfs"]
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_raw_inpcqt.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "regress_rpm_sfs", "regress_total_rpm_sfs"]
 
 
     # Which samples should be smoothed? Smoothing currently only supported for
@@ -172,7 +172,7 @@ coverage_and_norm:
     #   'mirror' - mirrors half the window at the edges.
     bwtools_smooth:
         param_string:
-            value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
+            value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap' --smooth_minmax"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.
@@ -297,6 +297,9 @@ quality_control:
         num_samps: 1000
     bamPEFragSize:
         bin_dist: 10000
+    frags_per_contig:
+        samtools_param_string:
+            column: "samtools_params"
 
 
 
