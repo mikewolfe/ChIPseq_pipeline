@@ -172,7 +172,7 @@ coverage_and_norm:
     #   'mirror' - mirrors half the window at the edges.
     bwtools_smooth:
         param_string:
-            value: "--operation 'Bspline_smooth' --smooth_knots 'test/smooth_knots.tsv' --smooth_minmax"
+            value: "--operation 'Bspline_smooth' --smooth_knots 'test/smooth_knots.tsv' --smooth_scaler 'fractional'"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.

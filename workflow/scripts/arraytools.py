@@ -181,9 +181,19 @@ def Bspline_1D(array, knot_locs = None):
     this_filter = np.isfinite(array)
     t,c,k  = interpolate.splrep(x[this_filter], array[this_filter], t=knot_locs, per =1)
     print(t, c, k)
-    out_spline = interpolate.BSpline(t,c,k, extrapolate = "periodic")
+    out_spline = interpolate.BSpline(t,c,k, extrapolate = False)
     return out_spline(x)
 
+def fractional_1D(array):
+    """
+    Function to scale a 1D signal based on the total signal
+
+    Args:
+        array - 1 dimensional numpy array
+    Returns:
+        outarray - (array/sum(array))*len(array)
+    """
+    return (array/np.nansum(array))*len(array)
 
 def min_max_1D(array):
     """

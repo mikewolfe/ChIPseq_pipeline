@@ -115,7 +115,7 @@ def Median_norm(arrays, pseudocount = 0):
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, median)
     return arrays
 
-def smooth(arrays, wsize, kernel_type, edge, sigma = None, min_max = False):
+def smooth(arrays, wsize, kernel_type, edge, sigma = None, scaler = None):
     """
     Smooth data using a convolution with a kernel (flat or gaussian).
 
@@ -130,12 +130,12 @@ def smooth(arrays, wsize, kernel_type, edge, sigma = None, min_max = False):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.smooth_1D(arrays[chrm], wsize, kernel_type, edge, sigma)
-        if min_max:
-            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
     return arrays
 
 
-def smooth_spline(arrays, knots = None, min_max = False):
+def smooth_spline(arrays, knots = None, scaler = None):
     """
     Smooth data using a cubic Bspline
 
@@ -148,11 +148,11 @@ def smooth_spline(arrays, knots = None, min_max = False):
     for chrm in arrays.keys():
         these_knots = knots.get(chrm, None)
         arrays[chrm] = arraytools.Bspline_1D(arrays[chrm], these_knots)
-        if min_max:
-            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
     return arrays
 
-def savgol(arrays, wsize, polyorder, edge, min_max = False):
+def savgol(arrays, wsize, polyorder, edge, scaler = None):
     """
     Smooth data using a Savtizky-Golay filter
 
@@ -169,8 +169,8 @@ def savgol(arrays, wsize, polyorder, edge, min_max = False):
     """
     for chrm in arrays.keys():
         arrays[chrm] = arraytools.savgol_1D(arrays[chrm], wsize, polyorder=polyorder, edge=edge)
-        if min_max:
-            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
     return arrays
 
 
@@ -285,6 +285,12 @@ def manipulate_main(args):
     summary_func_dict = { "mean": np.nanmean,
             "median": np.nanmedian,
             "sum": np.nansum }
+    scaler_dict = {"min_max": lambda x: arraytools.min_max_1D(x),
+                    "fractional": lambda x: arraytools.fractional_1D(x)}
+    if args.smooth_scaler is not None:
+        smooth_scaler = scaler_dict[args.smooth_scaler]
+    else:
+        smooth_scaler = None
 
     operation_dict={"RobustZ": RobustZ_transform, 
             "Median_norm": lambda x: Median_norm(x, args.pseudocount),
@@ -295,9 +301,9 @@ def manipulate_main(args):
             "query_subtract": lambda x: query_subtract(x, args.res, args.query_regions, args.number_of_regions, summary_func = summary_func_dict[args.summary_func]),
             "spike_scale": lambda x: fixed_scale(x, args.fixed_regions, args.res, summary_func = summary_func_dict[args.summary_func]),
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma, min_max = args.smooth_minmax),
-            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, min_max = args.smooth_minmax),
-            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, min_max = args.smooth_minmax),
-            "Bspline_smooth": lambda x: smooth_spline(x, read_knot_file(args.smooth_knots, args.res), min_max = args.smooth_minmax),
+            "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, scaler = smooth_scaler),
+            "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, scaler = smooth_scaler),
+            "Bspline_smooth": lambda x: smooth_spline(x, read_knot_file(args.smooth_knots, args.res), scaler = smooth_scaler),
             "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
     # Extra logic if trying to downsample everything which requires both strands
@@ -1496,8 +1502,9 @@ if __name__ == "__main__":
     parser_manipulate.add_argument('--gauss_sigma', type = int,
             help = "For gaussian smoothing what is sigma? Must not \
             be larger than the full window size. Default is wsize*2/6")
-    parser_manipulate.add_argument('--smooth_minmax', action = "store_true",
-            help = "Put the smoothed signal on a 0-1 scale?")
+    parser_manipulate.add_argument('--smooth_scaler', type = str,
+            help = "Scale the smooth signal? min_max = min max scaler. fractional = array/sum(array)*len(array)",
+            default = None)
     parser_manipulate.add_argument('--smooth_knots', type = str,
             help = "Text file with one row of chrm\\tknot per knot; Otherwise let smoother find optimal knots", default = None)
     parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
