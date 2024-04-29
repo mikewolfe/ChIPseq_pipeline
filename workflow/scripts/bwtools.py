@@ -34,6 +34,50 @@ def write_arrays_to_bigwig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandI
             outf.addEntries(names[the_finite], starts[the_finite], 
                     ends = ends[the_finite], values=this_array[the_finite])
 
+
+def write_arrays_to_bedgraph(outfilename, arrays, chrm_dict, res = 1, dropNaNsandInfs = False, header=False):
+    """
+    Convert a set of arrays for each contig to a bedgraph file
+    
+    Args:
+        outfilename - (str) output file name
+        arrays - (dict) a dictionary of numpy arrays
+        chrm_dict - (dict) a dictionary of chromosome lengths
+        res - resolution that the array is in
+    Returns:
+        Writes a bedgraph file
+    """
+    with open(outfilename, "w") as outf:
+        if header:
+            outf.write("chrom\tstart\tend\tvalue\n")
+        chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+        for key in chrm_dict.keys():
+            this_array = arrays[key]
+            # make sure nans don't get added to the bedgraph file
+            if dropNaNsandInfs:
+                the_finite = np.isfinite(this_array)
+            else:
+                the_finite = np.ones(len(this_array), dtype=bool)
+            starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
+            ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
+            if len(ends) < len(starts):
+                ends = np.append(ends, chrm_dict[key])
+            names = np.array([key]*len(starts))
+            for name, start, end, value in zip(names[the_finite], starts[the_finite], ends[the_finite], this_array[the_finite]):
+                outf.write("%s\t%s\t%s\t%s\n"%(name, start, end, value))
+
+def change_array_resolution(arrays, chrm_dict, summary_func = np.nanmean, res_from = 1, res_to = 1):
+    """
+    Change the resolution of an array by applying a summary function over bins
+    """
+    if res_to < res_from:
+        raise ValueError("Can't go from lower res to higher res (%s to %s)"%(res_from, res_to))
+    chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+    for key in chrm_dict.keys():
+        this_array = arraytools.to_lower_resolution(arrays[key], res_to//res_from, summary_func)
+        arrays[key] = this_array
+    return arrays
+
 def bigwig_to_arrays(bw, res = None, nan_to_zero = False):
     """
     Convert a bigwig to a dictionary of numpy arrays, one entry per contig
@@ -339,17 +383,19 @@ def manipulate_main(args):
 
         # perform operation on arrays
         arrays = operation_dict[args.operation](arrays)
-
+        
         # write out file
         write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.res, dropNaNsandInfs = args.dropNaNsandInfs)
         inf.close()
 
-def read_multiple_bws(bw_files, res = 1):
+def read_multiple_bws(bw_files, res = 1, res_to = None):
     all_bws = {}
     open_fhandles = [pyBigWig.open(fname) for fname in bw_files]
     for fname, handle in zip(bw_files, open_fhandles):
         print(fname)
         all_bws[fname] = bigwig_to_arrays(handle, res = res)
+        if res_to is not None:
+            all_bws[fname] = change_array_resolution(all_bws[fname], handle.chroms(), res_from = res, res_to =res_to)
     return (all_bws, open_fhandles)
 
 
@@ -537,7 +583,7 @@ def query_main(args):
     inbed = bed_utils.BedFile()
     inbed.from_bed_file(args.regions)
     res = args.res
-    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = res)
+    all_bws, open_fhandles = read_multiple_bws(args.infiles, res = args.res, res_to = args.res_to)
     if args.gzip:
         import gzip
     
@@ -559,17 +605,23 @@ def query_main(args):
         all_minus_bws = None
         minus_stfn = None
 
+
+    if args.res_to is not None:
+        res = args.res_to
+    else:
+        res = args.res
+
     summary_funcs = {'mean' : np.nanmean,
             'median': np.nanmedian,
             'max' : np.nanmax,
             'min' : np.nanmin,
             'RPP' : relative_polymerase_progression,
-            'TR' : lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
-            'TR_A': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
-            'TR_B': lambda array: traveling_ratio(array, args.res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
+            'TR' : lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "ratio"),
+            'TR_A': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "A") ,
+            'TR_B': lambda array: traveling_ratio(array, res, args.wsize, args.TR_A_center, args.upstream, out = "B"),
             # kept for compatibility
-            'TR_fixed' : lambda array: traveling_ratio(array, args.res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
-            'summit_loc': lambda array: summit_loc(array, args.res, args.wsize, args.upstream),
+            'TR_fixed' : lambda array: traveling_ratio(array, res, args.wsize, args.upstream, args.TR_A_center, out = "ratio"),
+            'summit_loc': lambda array: summit_loc(array, res, args.wsize, args.upstream),
             'Gini': lambda array: gini_coefficient(array)}
     try:
         summary_func = summary_funcs[args.summary_func]
@@ -1452,6 +1504,27 @@ def normfactor_main(args):
         close_multiple_bigwigs(bw_handles)
         close_multiple_bigwigs(inp_bw_handles)
 
+def convert_main(args):
+    summary_operation_dict = {"mean": np.nanmean,
+            "sum": np.nansum,
+            "median": np.nanmedian,
+            "max": np.nanmax,
+            "min": np.nanmin}
+    # read in files
+    inf = pyBigWig.open(args.infile)
+
+    arrays = bigwig_to_arrays(inf, res = args.inres)
+    # convert resolution
+    arrays = change_array_resolution(arrays, inf.chroms(), summary_operation_dict[args.summary_func], \
+                                     res_from = args.inres, res_to = args.outres)
+    #write file out
+    if args.outfmt == ".bedgraph":
+        write_arrays_to_bedgraph(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs, header = args.header)
+    elif args.outfmt == ".bw":
+        write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs)
+    else:
+        raise ValueError("Only support --outfmt of '.bedgraph' and '.bw'. Not %s"%(args.outfmt))
+    inf.close()
  
 if __name__ == "__main__":
     import argparse
@@ -1534,6 +1607,10 @@ if __name__ == "__main__":
     parser_query.add_argument('--res', type=int, default=1,
             help="Resolution to compute statistics at. Default 1bp. Note this \
             should be set no lower than the resolution of the input file")
+    parser_query.add_argument('--res_to', type=int, default=None,
+            help="Resolution to output at. Default same resolution as input. Note this \
+            should be set no lower than the resolution of the input file. \
+            Resolution changes are made by averaging over window before any calculations are done")
     parser_query.add_argument('--regions', type=str, help = "regions to grab data from")
     parser_query.add_argument('--coords', type = str, help = "When running in 'identity' mode do you want 'relative_start', 'relative_center', 'relative_end' or 'absolute' coords? Default = 'absolute'")
     parser_query.add_argument('--upstream', type=int, help = "bp upstream to add", default = 0)
@@ -1610,6 +1687,21 @@ if __name__ == "__main__":
             help = "Drop NaNs and Infs from output bigwig")
     parser_normfactor.add_argument("--antisense", action = "store_true", help = "Use antisense instead of sense values for each expected region")
     parser_normfactor.set_defaults(func=normfactor_main)
+
+
+    # convert verb
+    parser_convert = subparsers.add_parser("convert", help = "Convert a bigwig file into a bedGraph file")
+    parser_convert.add_argument('infile', type = str,
+            help = "file to convert from")
+    parser_convert.add_argument('outfile', type = str, help = "file to convert to")
+    parser_convert.add_argument('--inres', type = int, default = 1, help = "input resolution. Default 1")
+    parser_convert.add_argument('--outres', type = int, default = 1000, help = "output resolution. Default 1000")
+    parser_convert.add_argument('--summary_func', type = str, default = "mean", help = "function to collapse values to lower resolutions, default = mean")
+    parser_convert.add_argument('--header', action = "store_true", help = "include a header?")
+    parser_convert.add_argument('--outfmt', type = str, default = ".bedgraph", help = "what output format? default = '.bedgraph'. Use '.bw' for outputting a bigwig")
+    parser_convert.add_argument('--dropNaNsandInfs', action="store_true",
+            help = "Drop NaNs and Infs from output file")
+    parser_convert.set_defaults(func=convert_main)
 
     
     args = parser.parse_args()

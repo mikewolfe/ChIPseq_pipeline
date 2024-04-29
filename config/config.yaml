@@ -445,6 +445,32 @@ postprocessing:
             # for summarize "identity". Try to do this on a small number of
             # samples of the same type
             calc_spearman: true
+
+        all_genes_cov_500bp_res:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # Specify how you want the coordinates to be reported in. Options
+            # include "relative_start", "relative_end", "relative_center" and
+            # "absolute". Default is "absolute"
+            coord: "absolute"
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+            # Change the resolution before doing calculations?
+            res_to: 500
+
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?

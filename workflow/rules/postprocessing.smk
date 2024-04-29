@@ -162,6 +162,13 @@ rule deeptools_referencepoint:
         "--sortRegions keep "
         "--numberOfProcessors {threads} > {log.stdout} 2> {log.stderr} "
 
+def change_resolution_query(config, model):
+    try:
+        out = lookup_in_config(config, ["postprocessing", "bwtools_query", model, "res_to"], None)
+        out = "--res_to %s"%(out)
+    except KeyError as err:
+        out = ""
+    return out
 
 rule bwtools_query:
     input:
@@ -181,7 +188,8 @@ rule bwtools_query:
         summary_func = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "summary_func"], 'mean'),
         coord = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "coord"], 'absolute'),
         frac_na = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "frac_na"], 0.25),
-        bwtools_query_params = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "bwtools_query_params"], " ")
+        bwtools_query_params = lambda wildcards: lookup_in_config(config, ["postprocessing", "bwtools_query", wildcards.model, "bwtools_query_params"], " "),
+        res_to = lambda wildcards: change_resolution_query(config, wildcards.model)
     threads:
         5
     conda:
@@ -200,6 +208,7 @@ rule bwtools_query:
         "--summary_func {params.summary_func} "
         "--frac_na {params.frac_na} "
         "--gzip "
+        "{params.res_to} "
         "{params.bwtools_query_params} "
         "> {log.stdout} 2> {log.stderr} "
 

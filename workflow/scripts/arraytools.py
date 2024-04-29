@@ -258,3 +258,16 @@ def traveling_ratio(array, wsize = 50, peak = None, out = "ratio"):
         raise ValueError("out Must be ratio, A, or B")
 
     return out_val
+
+def to_lower_resolution(array, res_scale_factor = 5, summary_func = np.nanmean): 
+    size = len(array)
+    if res_scale_factor >= size:
+        raise ValueError("Attempt to go to lower resolution than entire array array size %s res factor %s"%(size, res_scale_factor))
+    outarray = []
+
+    for index in np.arange(0, size, res_scale_factor):
+        end = index + res_scale_factor
+        if end >= size:
+            end = size
+        outarray.append(summary_func(array[index:end]))
+    return np.array(outarray)
