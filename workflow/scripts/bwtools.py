@@ -134,6 +134,24 @@ def smooth(arrays, wsize, kernel_type, edge, sigma = None, min_max = False):
             arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
     return arrays
 
+
+def smooth_spline(arrays, knots = None, min_max = False):
+    """
+    Smooth data using a cubic Bspline
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        knots (list) - locations in array coordinates of knots
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        these_knots = knots.get(chrm, None)
+        arrays[chrm] = arraytools.Bspline_1D(arrays[chrm], these_knots)
+        if min_max:
+            arrays[chrm] = arraytools.min_max_1D(arrays[chrm])
+    return arrays
+
 def savgol(arrays, wsize, polyorder, edge, min_max = False):
     """
     Smooth data using a Savtizky-Golay filter
@@ -247,6 +265,19 @@ def scale_region_max(arrays, number_of_regions, query_regions = None, res =1, su
         arrays[chrm] = arraytools.normalize_1D(arrays[chrm], 0, scale_factor)
     return arrays
 
+def read_knot_file(knot_file, res = 1):
+    if knot_file is not None:
+        with open(knot_file, mode = "r") as inf:
+            knot_dict = {}
+            for line in inf:
+                chrm, knot = line.split("\t")
+                these_knots = knot_dict.get(chrm, [])
+                these_knots.append(int(knot)//res)
+                knot_dict[chrm] = these_knots
+    else:
+        knot_dict = None
+
+    return knot_dict
 
 
 def manipulate_main(args):
@@ -266,6 +297,7 @@ def manipulate_main(args):
             "gauss_smooth": lambda x: smooth(x, args.wsize, kernel_type = "gaussian", edge = args.edge, sigma = args.gauss_sigma, min_max = args.smooth_minmax),
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, min_max = args.smooth_minmax),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, min_max = args.smooth_minmax),
+            "Bspline_smooth": lambda x: smooth_spline(x, read_knot_file(args.smooth_knots, args.res), min_max = args.smooth_minmax),
             "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
     # Extra logic if trying to downsample everything which requires both strands
@@ -1466,6 +1498,8 @@ if __name__ == "__main__":
             be larger than the full window size. Default is wsize*2/6")
     parser_manipulate.add_argument('--smooth_minmax', action = "store_true",
             help = "Put the smoothed signal on a 0-1 scale?")
+    parser_manipulate.add_argument('--smooth_knots', type = str,
+            help = "Text file with one row of chrm\\tknot per knot; Otherwise let smoother find optimal knots", default = None)
     parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
             help = "A table of scale factors for scale_byfactor")
     parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,

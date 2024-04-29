@@ -165,6 +165,25 @@ def savgol_1D(array, wsize, polyorder=5, deriv=0, delta = 1.0, edge = "mirror"):
         raise ValueError("polyorder shouldn't be larger than window. Window %s, polyorder %s"%(tot_size, polyorder))
     return signal.savgol_filter(array, tot_size, polyorder, deriv, delta, mode = edge)
 
+def Bspline_1D(array, knot_locs = None):
+    """
+    Function to fit a cubic B spline with set knot locations
+
+    Args:
+        array - 1 dimensional numpy array
+        knot_locs - sorted 1D knot locations. Internal nots only
+    Returns:
+        outarray - spline smoothed output
+
+    """
+    from scipy import interpolate
+    x = np.arange(0, len(array))
+    this_filter = np.isfinite(array)
+    t,c,k  = interpolate.splrep(x[this_filter], array[this_filter], t=knot_locs, per =1)
+    print(t, c, k)
+    out_spline = interpolate.BSpline(t,c,k, extrapolate = "periodic")
+    return out_spline(x)
+
 
 def min_max_1D(array):
     """
