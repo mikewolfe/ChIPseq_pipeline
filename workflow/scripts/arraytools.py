@@ -198,7 +198,7 @@ def GLMGam_1D(array, starting_knots = 10):
     """
     import statsmodels.api as sm
     import pandas as pd
-    from statsmodels.gam.api import GLMGam, BSplines
+    from statsmodels.gam.api import GLMGam, CyclicCubicSplines
     # x is coordinates
     x = np.arange(0, len(array))
     # filter out nans
@@ -206,7 +206,7 @@ def GLMGam_1D(array, starting_knots = 10):
     # make dataframe
     d_1d = pd.DataFrame({"x":x[this_filter], "y" : array[this_filter]})
     # make spline basis. k=10 is default for mgcv::gam in R
-    bs = BSplines(d_1d[['x']], df = starting_knots, degree  = 3)
+    bs = CyclicCubicSplines(d_1d[['x']], df = [starting_knots])
     # set up formula for fitting; do poisson to avoid values < 0 since should be
     # acting on raw count data
     gam_bs = GLMGam.from_formula('y ~ 1', data = d_1d, smoother = bs, family = sm.families.Poisson())
