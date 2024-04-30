@@ -2,8 +2,9 @@ channels:
     - conda-forge
     - bioconda
 dependencies:
-    - numpy=1.19.0
-    - scipy=1.5.2
-    - deeptools=3.5.0
+    - numpy>=1.19.0
+    - scipy>=1.5.2
+    - statsmodels>=0.14.1
+    - deeptools>=3.5.0
     - pandas
     - scikit-learn

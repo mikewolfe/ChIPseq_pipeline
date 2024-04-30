@@ -180,9 +180,43 @@ def Bspline_1D(array, knot_locs = None):
     x = np.arange(0, len(array))
     this_filter = np.isfinite(array)
     t,c,k  = interpolate.splrep(x[this_filter], array[this_filter], t=knot_locs, per =1)
-    print(t, c, k)
     out_spline = interpolate.BSpline(t,c,k, extrapolate = False)
     return out_spline(x)
+
+
+def GLMGam_1D(array, starting_knots = 10):
+    """
+    Function to fit GAM to smooth the data. Uses Bsplines as smoother
+    in the model
+
+    Args:
+        array - 1 dimensional numpy array
+        starting_knots - number of knots to start. 10 is mgcv::gam default in R
+    Returns:
+        outarray - spline smoothed output
+
+    """
+    import statsmodels.api as sm
+    import pandas as pd
+    from statsmodels.gam.api import GLMGam, BSplines
+    # x is coordinates
+    x = np.arange(0, len(array))
+    # filter out nans
+    this_filter = np.isfinite(array)
+    # make dataframe
+    d_1d = pd.DataFrame({"x":x[this_filter], "y" : array[this_filter]})
+    # make spline basis. k=10 is default for mgcv::gam in R
+    bs = BSplines(d_1d[['x']], df = starting_knots, degree  = 3)
+    # set up formula for fitting; do poisson to avoid values < 0 since should be
+    # acting on raw count data
+    gam_bs = GLMGam.from_formula('y ~ 1', data = d_1d, smoother = bs, family = sm.families.Poisson())
+    # fit the data
+    res_bs = gam_bs.fit()
+    # now predict on the full coordinate space
+    d_out = pd.DataFrame({"x":x})
+    # return the predicted smooth curve
+    out_spline = np.asarray(res_bs.predict(d_out, exog_smooth = d_out))
+    return out_spline
 
 def fractional_1D(array):
     """

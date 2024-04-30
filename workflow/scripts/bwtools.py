@@ -218,6 +218,26 @@ def savgol(arrays, wsize, polyorder, edge, scaler = None):
     return arrays
 
 
+def smooth_GLMGam(arrays, max_knots=10, scaler = None):
+    """
+    Smooth data using a GLMGam.
+    Assumes you are working with count data since it fits
+    a Poisson model
+
+    Args:
+        arrays (dict) - dictionary of numpy arrays
+        max_knots (int) - maximum number of knots to start with
+    Returns:
+        outarrays - dictionary of numpy arrays
+    """
+    for chrm in arrays.keys():
+        arrays[chrm] = arraytools.GLMGam_1D(arrays[chrm], max_knots)
+        if scaler is not None:
+            arrays[chrm] = scaler(arrays[chrm])
+    return arrays
+
+
+
 def fixed_subtract(arrays, fixed_regions = None, res = 1, summary_func = np.nanmean):
     import bed_utils
     inbed = bed_utils.BedFile()
@@ -348,6 +368,7 @@ def manipulate_main(args):
             "flat_smooth": lambda x: smooth(x, args.wsize, kernel_type = "flat", edge = args.edge, scaler = smooth_scaler),
             "savgol_smooth": lambda x: savgol(x, args.wsize, polyorder = args.savgol_poly, edge = args.edge, scaler = smooth_scaler),
             "Bspline_smooth": lambda x: smooth_spline(x, read_knot_file(args.smooth_knots, args.res), scaler = smooth_scaler),
+            "GLMGam_smooth": lambda x: smooth_GLMGam(x, args.gam_max_knots, scaler = smooth_scaler),
             "scale_byfactor": lambda x: scale_byfactor(x, args.scalefactor_table, args.scalefactor_id, args.pseudocount)}
 
     # Extra logic if trying to downsample everything which requires both strands
@@ -1545,7 +1566,8 @@ if __name__ == "__main__":
             help="operation to perform before writing out file. \
             All operations, neccesitate conversion to array internally \
             options {'RobustZ', 'Median_norm', 'background_subtract', 'scale_max', \
-            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'scale_byfactor', 'downsample'}")
+            'query_subtract', 'query_scale', 'gauss_smooth', 'flat_smooth', 'savgol_smooth', 'Bspline_smooth',\
+            'GLMGam_smooth','scale_byfactor', 'downsample'}")
     parser_manipulate.add_argument('--fixed_regions', type=str, default=None,
             help="bed file containing a fixed set of regions on which to average over.")
     parser_manipulate.add_argument('--query_regions', type=str, default=None,
@@ -1580,6 +1602,8 @@ if __name__ == "__main__":
             default = None)
     parser_manipulate.add_argument('--smooth_knots', type = str,
             help = "Text file with one row of chrm\\tknot per knot; Otherwise let smoother find optimal knots", default = None)
+    parser_manipulate.add_argument('--gam_max_knots', type = int,
+            help = "Maximum total knots for gam smoother. Default = 10", default = 10)
     parser_manipulate.add_argument('--scalefactor_table', type = str, default = None,
             help = "A table of scale factors for scale_byfactor")
     parser_manipulate.add_argument('--scalefactor_id', type = str, nargs = 2, default = None,

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Develop
 
 ### Added
+- Implemented GLMGam smoothing
 - Ability to calculate queries at lower resolutions with bwtools
 - Bspline smoothing based on specified knots
 - Input correction using smoothed inputs
