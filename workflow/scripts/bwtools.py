@@ -66,6 +66,43 @@ def write_arrays_to_bedgraph(outfilename, arrays, chrm_dict, res = 1, dropNaNsan
             for name, start, end, value in zip(names[the_finite], starts[the_finite], ends[the_finite], this_array[the_finite]):
                 outf.write("%s\t%s\t%s\t%s\n"%(name, start, end, value))
 
+def write_arrays_to_wig(outfilename, arrays, chrm_dict, res = 1, dropNaNsandInfs = False, header=False):
+    """
+    Convert a set of arrays for each contig to a bedgraph file
+    
+    Args:
+        outfilename - (str) output file name
+        arrays - (dict) a dictionary of numpy arrays
+        chrm_dict - (dict) a dictionary of chromosome lengths
+        res - resolution that the array is in
+    Returns:
+        Writes a variableStep .wig file
+    """
+    with open(outfilename, "w") as outf:
+
+        outf.write("track type=wiggle_0\n")
+        chrm_list = [(key, chrm_dict[key]) for key in chrm_dict.keys()]
+        for key in chrm_dict.keys():
+            if key in arrays:
+                this_array = arrays[key]
+            else:
+                continue
+            # make sure nans don't get added to the bedgraph file
+            if dropNaNsandInfs:
+                the_finite = np.isfinite(this_array)
+            else:
+                the_finite = np.ones(len(this_array), dtype=bool)
+            starts = np.arange(0, chrm_dict[key], res, dtype=np.int64)
+            ends = np.arange(res, chrm_dict[key], res, dtype=np.int64)
+            if len(ends) < len(starts):
+                ends = np.append(ends, chrm_dict[key])
+            names = np.array([key]*len(starts))
+            # write header for chromosome
+            outf.write("variableStep chrom=%s\n"%(key))
+            # Simplest wig, one row per datum. Put datum on start of bin.
+            for name, start, end, value in zip(names[the_finite], starts[the_finite], ends[the_finite], this_array[the_finite]):
+                outf.write("%s %s\n"%(start+1, value))
+
 def change_array_resolution(arrays, chrm_dict, summary_func = np.nanmean, res_from = 1, res_to = 1):
     """
     Change the resolution of an array by applying a summary function over bins
@@ -1536,15 +1573,24 @@ def convert_main(args):
 
     arrays = bigwig_to_arrays(inf, res = args.inres)
     # convert resolution
-    arrays = change_array_resolution(arrays, inf.chroms(), summary_operation_dict[args.summary_func], \
+    if args.inres != args.outres:
+        arrays = change_array_resolution(arrays, inf.chroms(), summary_operation_dict[args.summary_func], \
                                      res_from = args.inres, res_to = args.outres)
+    # filter chrms you want
+    if args.chrms is not None:
+        out_arrays = {}
+        for chrm in args.chrms:
+            out_arrays[chrm] = arrays[chrm]
+        arrays = out_arrays
     #write file out
     if args.outfmt == ".bedgraph":
         write_arrays_to_bedgraph(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs, header = args.header)
+    elif args.outfmt == ".wig":
+        write_arrays_to_wig(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs, header = args.header)
     elif args.outfmt == ".bw":
         write_arrays_to_bigwig(args.outfile, arrays, inf.chroms(), res = args.outres, dropNaNsandInfs = args.dropNaNsandInfs)
     else:
-        raise ValueError("Only support --outfmt of '.bedgraph' and '.bw'. Not %s"%(args.outfmt))
+        raise ValueError("Only support --outfmt of '.bedgraph', '.wig', and '.bw'. Not %s"%(args.outfmt))
     inf.close()
  
 if __name__ == "__main__":
@@ -1725,6 +1771,7 @@ if __name__ == "__main__":
     parser_convert.add_argument('--outfmt', type = str, default = ".bedgraph", help = "what output format? default = '.bedgraph'. Use '.bw' for outputting a bigwig")
     parser_convert.add_argument('--dropNaNsandInfs', action="store_true",
             help = "Drop NaNs and Infs from output file")
+    parser_convert.add_argument('--chrms', type = str, nargs = "+", default = ".bedgraph", help = "what output format? default = '.bedgraph'. Use '.bw' for outputting a bigwig")
     parser_convert.set_defaults(func=convert_main)
 
     
