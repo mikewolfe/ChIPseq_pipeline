@@ -107,7 +107,7 @@ coverage_and_norm:
             pseudocount: 0.1
             spikecontigs: "U00096.3"
             # only consider the samples that have a genotype A
-            filter: 'not input_sample.isnull()'
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which regions to use? Specifying a file like this has the pipeline
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
@@ -124,7 +124,7 @@ coverage_and_norm:
             pseudocount: 0.1
             spikecontigs: "U00096.3"
             # only consider the samples that have a genotype A
-            filter: 'not input_sample.isnull()'
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_raw_inpcqt.bw"
@@ -230,7 +230,7 @@ coverage_and_norm:
         # samples
         mean_genotypeA:
             # Filter for genotype A files but exclude the input samples
-            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupA: 'genotype == "A" and not input_sample.isnull() and input_sample != ""'
             # Choose the raw bigwigs as the inputs for each of these samples
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             # Choose an average calculation as the summary statistic. Other 
@@ -242,9 +242,9 @@ coverage_and_norm:
         # average of all genotypeB tracks. 
         mean_genotypeA_minus_mean_genotypeB:
             # Filter for genotype A files but exclude the input samples
-            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupA: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # Filter for genotype B files but exclude the input samples
-            filter_groupB: 'genotype == "B" and not input_sample.isnull()'
+            filter_groupB: 'genotype == "B" and input_sample != "" and not input_sample.isnull()'
             # Choose the raw bigwigs as the inputs for each of these samples
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             # Choose an average calculation as the summary statistic. Other 
@@ -258,9 +258,9 @@ coverage_and_norm:
 
         mean_genotypeA_mean_genotypeB_log2ratio:
             # Filter for genotype A files but exclude the input samples
-            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupA: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # Filter for genotype B files but exclude the input samples
-            filter_groupB: 'genotype == "B" and not input_sample.isnull()'
+            filter_groupB: 'genotype == "B" and input_sample != "" and not input_sample.isnull()'
             # Choose the raw bigwigs as the inputs for each of these samples
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             # Choose an average calculation as the summary statistic. Other 
@@ -277,7 +277,6 @@ quality_control:
     qc_to_run:
         - "fastqc"
         - "coverage"
-        - "correlation"
         - "pe_fragment"
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
@@ -301,8 +300,6 @@ quality_control:
         samtools_param_string:
             column: "samtools_params"
 
-
-
 # Options to control peak calling
 # run with run_peak_calling
 peak_calling:
@@ -311,7 +308,7 @@ peak_calling:
         # specify the peak caller to use. Currently only support "cmarrt" and "macs2"
         peak_caller: "cmarrt"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Choose which coverage file you want to run the peak caller on
         filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
         # Window size is required for cmarrt
@@ -327,7 +324,7 @@ peak_calling:
     macs2_all:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -348,7 +345,7 @@ peak_calling:
     macs2_broad_all:
         peak_caller: "macs2_broad"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -366,7 +363,7 @@ motif_calling:
         # Which motif caller? Supports meme and streme
         motif_caller: "streme"
         # Which samples to run on?
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which file to run on?
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         # Parameters for the background markov model
@@ -382,7 +379,7 @@ motif_calling:
     # Same thing but running a different motif finder
     macs2_all_meme:
         motif_caller: "meme"
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         get_markov_param_string:
             value: "-dna -m 0"
@@ -394,7 +391,7 @@ variant_calling:
     # Which samples do you want to run variant calling on. Typically
     # only the input samples as specified by having no sample name in
     # the "input_sample" column
-    filter: "input_sample.isnull() or not input_sample.isnull()"
+    filter: "not sample_name.isnull()"
     # Which reference to compare against. Reference must be defined above
     # in the reference section. Can specify a single value for all samples
     # or a column in the metadata sheet to define a reference for each
@@ -403,7 +400,7 @@ variant_calling:
         column: "genome"
 
 assembly:
-    filter: "input_sample.isnull() and genotype == 'A'"
+    filter: 'input_sample.isnull() or input_sample == "" and genotype == "A"'
     unicycler:
         unicycler_illumina_params: 
             value: " "
@@ -424,6 +421,7 @@ postprocessing:
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
             regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
@@ -451,6 +449,7 @@ postprocessing:
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
             regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
@@ -476,6 +475,7 @@ postprocessing:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
+            filter: 'input_sample != "" and not input_sample.isnull()'
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
@@ -497,7 +497,7 @@ postprocessing:
             # only consider the samples that have a genotype A. Ensure that they
             # have an associated input sample so that the input samples
             # themselves are not run.
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -518,7 +518,7 @@ postprocessing:
         # Model 4 - look at the traveling ratio for samples in genotype A
         genotypeA_all_genes_TR:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -541,7 +541,7 @@ postprocessing:
         # ratio
         genotypeA_all_genes_summit_loc:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -565,7 +565,7 @@ postprocessing:
         # ratio
         genotypeA_all_genes_TR_fixed:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -589,7 +589,7 @@ postprocessing:
         # ratio
         genotypeA_all_genes_TR_A:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -642,5 +642,3 @@ postprocessing:
             regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
             # only consider the samples that have a genotype A.
             filter: 'genotype == "A"'
-
-

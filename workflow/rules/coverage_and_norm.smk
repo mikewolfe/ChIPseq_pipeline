@@ -26,7 +26,7 @@ def determine_group_norm_files(config, pep):
     models = lookup_in_config(config, ["coverage_and_norm", "group_norm"], "")
     for model in models: 
         these_samples = filter_samples(pep, \
-            lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "filter"], "not input_sample.isnull()"))
+            lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "filter"], "input_sample != '' and not input_sample.isnull()"))
         for norm_type in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "methods"], []):
             outfiles.extend(["results/coverage_and_norm/group_norm/%s/%s_%s.bw"%(model, sample, norm_type) for sample in these_samples]) 
         for dwnsample in lookup_in_config(config, ["coverage_and_norm", "group_norm", model, "dwnsample"], []):
@@ -45,7 +45,7 @@ rule get_raw_coverage:
 def raw_or_smoothed(sample, pep, config):
     filtered = filter_samples(pep, \
     lookup_in_config(config, ["coverage_and_norm", "smooth_samples", "filter"], \
-    "not input_sample.isnull() and input_sample.isnull()"))
+    "not sample_name.isnull()"))
     if sample in filtered:
         out = "results/coverage_and_norm/bwtools_smooth/%s_smooth.bw"%sample
     else:
@@ -577,7 +577,7 @@ def pull_bws_for_bwtools_multicompare(modelname, config, pep):
     file_sig = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filesignature'],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
     groupA = [file_sig%(sample) for sample in groupA_samples]
-    if groupB_filter is not "":
+    if groupB_filter != "":
         for sample in filter_samples(pep, groupB_filter):
             groupA.append(file_sig%(sample))
     return groupA
@@ -586,7 +586,7 @@ def grouped_bws_for_bwtools_multicompare(modelname, config, pep, group_name):
     group_sample_filter = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filter_%s'%group_name], "")
     file_sig = lookup_in_config(config, ['coverage_and_norm', 'bwtools_multicompare', modelname, 'filesignature'],\
     "results/coverage_and_norm/deeptools_coverage/%s_raw.bw")
-    if group_sample_filter is not "":
+    if group_sample_filter != "":
         group = " ".join([file_sig%(sample) for sample in filter_samples(pep, group_sample_filter)])
         group = "--%s "%(group_name) + group
     else:
@@ -637,7 +637,7 @@ rule run_bwtools_multicompare:
 
 def pull_bws_for_group_norm_models(modelname, config, pep, ext_or_inp = "ext"):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     file_sig = "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
 
     if ext_or_inp == "ext":
@@ -649,12 +649,12 @@ def pull_bws_for_group_norm_models(modelname, config, pep, ext_or_inp = "ext"):
 
 def pull_labels_for_group_norm_models(modelname, config, pep):
     these_samples = filter_samples(pep, \
-    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "not input_sample.isnull()"))
+    lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "filter"], "input_sample != '' and not input_sample.isnull()"))
     return " ".join(these_samples)
 
 def pull_expected_regions_group_norm_models(modelname, config, pep):
     spikeregions = lookup_in_config(config, ["coverage_and_norm", "group_norm", modelname, "regions"], "")
-    if spikeregions is not "":
+    if spikeregions != "":
         out = "--expected_regions %s"%(spikeregions)
     else:
         out = ""

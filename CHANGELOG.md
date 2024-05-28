@@ -30,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Update to `bwtools` to do group-based normalization
 
 ### Bug fixes
+- Issue with syntax of comparisons in `coverage_and_norm.smk`
+- Issue with using `not input_sample.isnull()` in higher version of snakemake
 - Issue with `bwtools_multiprocessing` not correctly identifying needed input
   files
 - Issues with macs2 peak calling version

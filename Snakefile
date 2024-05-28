@@ -14,9 +14,22 @@ def lookup_sample_metadata(sample, key, pep):
     """
     Get sample metadata by key
     """
+    from pandas import isna
     if sample not in pep.sample_table.index:
         raise KeyError("Sample %s not in sample table"%sample)
-    return pep.sample_table.at[sample, key]
+
+    out = pep.sample_table.at[sample, key]
+    if isna(out) or out == "":
+        raise ValueError("Sample %s has no value at key %s"%(sample, key))
+    return out
+
+def lookup_sample_metadata_default(sample, key, pep, default = None):
+    try: 
+        out = lookup_sample_metadata(sample, key, pep)
+    except ValueError:
+        logger.warning("No value found for sample: '%s' column: '%s'. Defaulting to %s"%(sample, key, default))
+        out = default
+    return out
 
 def determine_fastqs_to_combine(sample, pair, pep):
     path = lookup_sample_metadata(sample, "file_path", pep)
@@ -47,10 +60,9 @@ def match_fastq_to_sample(sample, pair, pep):
     return out
 
 def determine_single_end(sample, pep):
-    from pandas import isna
     if "filenameR2" in pep.sample_table:
-        r2 = lookup_sample_metadata(sample, "filenameR2", pep)
-        if isna(r2):
+        r2 = lookup_sample_metadata_default(sample, "filenameR2", pep, "")
+        if r2 == "":
             out = True
         else:
             out = False
@@ -107,8 +119,7 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
 def determine_extracted_samples(pep):
     samp_table = pep.sample_table
     if "input_sample" in samp_table.columns:
-        samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
-        samples = samples.tolist()
+        samples = filter_samples(pep, "input_sample != '' and not input_sample.isnull()")
     else:
         samples = []
     return samples
