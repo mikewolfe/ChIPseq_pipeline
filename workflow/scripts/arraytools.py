@@ -267,27 +267,32 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, peak = None, out = "ratio"):
+def traveling_ratio(array, wsize = 50, wA = None, wB = None, out = "ratio"):
     # if peak isn't specified then dynamically find it
-    if peak is None:
-        peak = relative_summit_loc(array, wsize)
+    if wA is None:
+        wA = relative_summit_loc(array, wsize)
     # peak should at the very least be in the first half of the region
-    if peak >= len(array) / 2:
+    if wA >= len(array) / 2:
         return np.nan
-    peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
-    
-    # center should be far enough away that windows don't overlap
-    center = int((len(array) + peak)/2)
-    if center - wsize < peak + wsize:
+    wA_avg = np.nanmean(array[max(wA - wsize, 0):min(wA + wsize, len(array))])
+
+    if wB is None: 
+        # if not defined make wB halfway between the end of the array and the
+        # center of window A
+        wB = int((len(array) + wA)/2)
+
+    # wB should be far enough away that windows don't overlap; But also the
+    # window should not go off the end of the array
+    if wB - wsize < wA + wsize or wB + wsize > len(array):
         return np.nan
 
-    center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
+    wB_avg = np.nanmean(array[(wB - wsize):(wB + wsize)])
     if out == "ratio":
-        out_val = center_avg/peak_avg
+        out_val = wB_avg/wA_avg
     elif out == "A":
-        out_val = peak_avg
+        out_val = wA_avg
     elif out == "B":
-        out_val = center_avg
+        out_val = wB_avg
     else:
         raise ValueError("out Must be ratio, A, or B")
 
