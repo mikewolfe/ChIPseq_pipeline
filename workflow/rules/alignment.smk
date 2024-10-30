@@ -209,9 +209,16 @@ rule bowtie2_map_se:
         "{params.bowtie2_param_string} 2> {log.stderr} "
         "| samtools view {params.samtools_view_param_string} > {output}"
 
+def get_bam_to_sort(sample, config):
+    if lookup_in_config(config, ["alignment", "bam_sort", "markdups"], True):
+        out = "results/alignment/bowtie2/%s_marked.bam"%(sample)
+    else:
+        out = "results/alignment/bowtie2/%s.bam"%(sample)
+    return out
+
 rule bam_sort:
     input:
-        "results/alignment/bowtie2/{sample}_marked.bam"
+        lambda wildcards: get_bam_to_sort(wildcards.sample, config)
     output:
         "results/alignment/bowtie2/{sample}_sorted.bam"
     log:

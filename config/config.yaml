@@ -76,6 +76,9 @@ alignment:
         # is to just convert the sam records into a bam with -b
         samtools_view_param_string:
             value: "-b"
+    # have picard mark duplicates based on alignment?
+    bam_sort:
+        markdups: true
 
 
 # Options to control genome coverage calculations
