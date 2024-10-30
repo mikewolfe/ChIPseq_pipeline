@@ -14,25 +14,55 @@ def lookup_sample_metadata(sample, key, pep):
     """
     Get sample metadata by key
     """
+    from pandas import isna
     if sample not in pep.sample_table.index:
         raise KeyError("Sample %s not in sample table"%sample)
-    return pep.sample_table.at[sample, key]
 
-def match_fastq_to_sample(sample, pair, pep):
-    out = lookup_sample_metadata(sample, "file_path", pep)
+    out = pep.sample_table.at[sample, key]
+    if isna(out) or out == "":
+        raise ValueError("Sample %s has no value at key %s"%(sample, key))
+    return out
+
+def lookup_sample_metadata_default(sample, key, pep, default = None):
+    try: 
+        out = lookup_sample_metadata(sample, key, pep)
+    except ValueError:
+        logger.warning("No value found for sample: '%s' column: '%s'. Defaulting to %s"%(sample, key, default))
+        out = default
+    return out
+
+def determine_fastqs_to_combine(sample, pair, pep):
+    path = lookup_sample_metadata(sample, "file_path", pep)
     if pair == "R1" or pair == "R0":
-        out += lookup_sample_metadata(sample, "filenameR1", pep)
+        file_list = lookup_sample_metadata(sample, "filenameR1", pep)
     elif pair == "R2":
-        out += lookup_sample_metadata(sample, "filenameR2", pep)
+        file_list = lookup_sample_metadata(sample, "filenameR2", pep)
     else:
         raise ValueError("Pair must be R0 (single-end), R1, or R2 not %s"%pair)
+    out = []
+    for this_file in file_list.split(";"):
+        out.append(path + this_file)
+    return out
+        
+
+def match_fastq_to_sample(sample, pair, pep):
+    path = lookup_sample_metadata(sample, "file_path", pep)
+    if pair == "R1" or pair == "R0":
+        file_list = lookup_sample_metadata(sample, "filenameR1", pep)
+    elif pair == "R2":
+        file_list = lookup_sample_metadata(sample, "filenameR2", pep)
+    else:
+        raise ValueError("Pair must be R0 (single-end), R1, or R2 not %s"%pair)
+    if len(file_list.split(";")) > 1:
+        out = "results/preprocessing/combine_fastq/" + sample + "_" + pair + "_combined.fastq.gz"
+    else:
+        out = path + file_list
     return out
 
 def determine_single_end(sample, pep):
-    from pandas import isna
     if "filenameR2" in pep.sample_table:
-        r2 = lookup_sample_metadata(sample, "filenameR2", pep)
-        if isna(r2):
+        r2 = lookup_sample_metadata_default(sample, "filenameR2", pep, "")
+        if r2 == "":
             out = True
         else:
             out = False
@@ -88,8 +118,11 @@ def lookup_in_config_persample(config, pep, keys, sample, default = None, err = 
 
 def determine_extracted_samples(pep):
     samp_table = pep.sample_table
-    samples = samp_table.loc[~samp_table["input_sample"].isna(), "sample_name"]
-    return samples.tolist()
+    if "input_sample" in samp_table.columns:
+        samples = filter_samples(pep, "input_sample != '' and not input_sample.isnull()")
+    else:
+        samples = []
+    return samples
 
 def filter_samples(pep, filter_text):
     samp_table = pep.sample_table
@@ -161,6 +194,8 @@ include: "workflow/rules/peak_calling.smk"
 include: "workflow/rules/postprocessing.smk"
 include: "workflow/rules/variant_calling.smk"
 include: "workflow/rules/motif_calling.smk"
+include: "workflow/rules/assembly.smk"
+include: "workflow/rules/test.smk"
 
 
 

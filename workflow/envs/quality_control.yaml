@@ -2,7 +2,6 @@ channels:
     - conda-forge
     - bioconda
 dependencies:
-    - fastqc=0.11.8
-    - deeptools=3.5.0
-    - multiqc=1.11.0
-
+    - fastqc=0.12.1
+    - deeptools=3.5.2
+    - multiqc=1.14.0

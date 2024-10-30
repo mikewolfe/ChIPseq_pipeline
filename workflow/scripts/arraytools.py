@@ -165,6 +165,82 @@ def savgol_1D(array, wsize, polyorder=5, deriv=0, delta = 1.0, edge = "mirror"):
         raise ValueError("polyorder shouldn't be larger than window. Window %s, polyorder %s"%(tot_size, polyorder))
     return signal.savgol_filter(array, tot_size, polyorder, deriv, delta, mode = edge)
 
+def Bspline_1D(array, knot_locs = None):
+    """
+    Function to fit a cubic B spline with set knot locations
+
+    Args:
+        array - 1 dimensional numpy array
+        knot_locs - sorted 1D knot locations. Internal nots only
+    Returns:
+        outarray - spline smoothed output
+
+    """
+    from scipy import interpolate
+    x = np.arange(0, len(array))
+    this_filter = np.isfinite(array)
+    t,c,k  = interpolate.splrep(x[this_filter], array[this_filter], t=knot_locs, per =1)
+    out_spline = interpolate.BSpline(t,c,k, extrapolate = False)
+    return out_spline(x)
+
+
+def GLMGam_1D(array, starting_knots = 10):
+    """
+    Function to fit GAM to smooth the data. Uses Bsplines as smoother
+    in the model
+
+    Args:
+        array - 1 dimensional numpy array
+        starting_knots - number of knots to start. 10 is mgcv::gam default in R
+    Returns:
+        outarray - spline smoothed output
+
+    """
+    import statsmodels.api as sm
+    import pandas as pd
+    from statsmodels.gam.api import GLMGam, CyclicCubicSplines
+    # x is coordinates
+    x = np.arange(0, len(array))
+    # filter out nans
+    this_filter = np.isfinite(array)
+    # make dataframe
+    d_1d = pd.DataFrame({"x":x[this_filter], "y" : array[this_filter]})
+    # make spline basis. k=10 is default for mgcv::gam in R
+    bs = CyclicCubicSplines(d_1d[['x']], df = [starting_knots])
+    # set up formula for fitting; do poisson to avoid values < 0 since should be
+    # acting on raw count data
+    gam_bs = GLMGam.from_formula('y ~ 1', data = d_1d, smoother = bs, family = sm.families.Poisson())
+    # fit the data
+    res_bs = gam_bs.fit()
+    # now predict on the full coordinate space
+    d_out = pd.DataFrame({"x":x})
+    # return the predicted smooth curve
+    out_spline = np.asarray(res_bs.predict(d_out, exog_smooth = d_out))
+    return out_spline
+
+def fractional_1D(array):
+    """
+    Function to scale a 1D signal based on the total signal
+
+    Args:
+        array - 1 dimensional numpy array
+    Returns:
+        outarray - (array/sum(array))*len(array)
+    """
+    return (array/np.nansum(array))*len(array)
+
+def min_max_1D(array):
+    """
+    Function to scale a 1D signal to a 0,1 scale
+
+    Args:
+        array - 1 dimensional numpy array
+    Returns:
+        outarray - min maxed array of the same size
+
+    """
+    return (array - np.nanmin(array))/(np.nanmax(array) - np.nanmin(array))
+
 def weighted_center(array, only_finite = True, normalize = False):
     """
     Find the weighted center of a 1D array
@@ -191,24 +267,46 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, peak = None, length_cutoff = 1000):
-    # shouldn't do this with anything less than 1000 bp
-    if len(array) < length_cutoff:
-        return np.nan
+def traveling_ratio(array, wsize = 50, wA = None, wB = None, out = "ratio"):
     # if peak isn't specified then dynamically find it
-    if peak is None:
-        peak = relative_summit_loc(array, wsize)
+    if wA is None:
+        wA = relative_summit_loc(array, wsize)
     # peak should at the very least be in the first half of the region
-    if peak >= len(array) / 2:
+    if wA >= len(array) / 2:
         return np.nan
-    peak_avg = np.nanmean(array[max(peak - wsize, 0):min(peak + wsize, len(array))])
-    
-    # center should be far enough away that windows don't overlap
-    center = int((len(array) + peak)/2)
-    if center - wsize < peak + wsize:
+    wA_avg = np.nanmean(array[max(wA - wsize, 0):min(wA + wsize, len(array))])
+
+    if wB is None: 
+        # if not defined make wB halfway between the end of the array and the
+        # center of window A
+        wB = int((len(array) + wA)/2)
+
+    # wB should be far enough away that windows don't overlap; But also the
+    # window should not go off the end of the array
+    if wB - wsize < wA + wsize or wB + wsize > len(array):
         return np.nan
 
-    center_avg = np.nanmean(array[(center - wsize):(center + wsize)])
+    wB_avg = np.nanmean(array[(wB - wsize):(wB + wsize)])
+    if out == "ratio":
+        out_val = wB_avg/wA_avg
+    elif out == "A":
+        out_val = wA_avg
+    elif out == "B":
+        out_val = wB_avg
+    else:
+        raise ValueError("out Must be ratio, A, or B")
 
-    out = center_avg/peak_avg
-    return out    
+    return out_val
+
+def to_lower_resolution(array, res_scale_factor = 5, summary_func = np.nanmean): 
+    size = len(array)
+    if res_scale_factor >= size:
+        raise ValueError("Attempt to go to lower resolution than entire array array size %s res factor %s"%(size, res_scale_factor))
+    outarray = []
+
+    for index in np.arange(0, size, res_scale_factor):
+        end = index + res_scale_factor
+        if end >= size:
+            end = size
+        outarray.append(summary_func(array[index:end]))
+    return np.array(outarray)

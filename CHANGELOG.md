@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Develop
+
+### Added
+- Add conversion from bigwig to bedgraph and wig formats
+- Implemented GLMGam smoothing
+- Ability to calculate queries at lower resolutions with bwtools
+- Bspline smoothing based on specified knots
+- Input correction using smoothed inputs
+- Assembly of reads to look for genomic variants using unicycler and quast
+- Spike-in based scaling using DEseq2, spike-in counts, edgeR TMM, or Bonhoure
+  et al.  approaches
+- Deduplication with Picard MarkDuplicates.
+- Ability to get A and B average counts for the traveling ratio
+- Remove default max size for traveling ratio calculations
+- Ability to simulate ChIP-seq like traces for testing
+- Choose which quality control modules to run
+
+### Changes
+- Update versions of some packages including ncbi-acc-download to get around
+  rate filtering issue and multiqc to deal with python updates
+- Remove arbitrary gene length cutoff for traveling ratios
+- Enable window size to be changed for traveling ratios
+- Update to `bwtools` to do group-based normalization
+
+### Bug fixes
+- Issue with syntax of comparisons in `coverage_and_norm.smk`
+- Issue with using `not input_sample.isnull()` in higher version of snakemake
+- Issue with `bwtools_multiprocessing` not correctly identifying needed input
+  files
+- Issues with macs2 peak calling version
+
+
 ## 0.3.0 - 2023-07-15
 
 ### Added

@@ -17,7 +17,7 @@ def determine_peak_calling_files(config, pep):
         peak_caller = lookup_in_config(config, ["peak_calling", model, "peak_caller"], 
         err = "Need peak caller specified for peak_caller model %s in config file. I.e. \npeak_calling:\n\t%s:\n\t\tpeak_caller: 'macs2'"%(model,model))
         these_samples = filter_samples(pep, \
-        lookup_in_config(config, ["peak_calling", model, "filter"], "not input_sample.isnull()"))
+        lookup_in_config(config, ["peak_calling", model, "filter"], "input_samples != '' and input_sample.isnull()"))
         if peak_caller == "macs2_broad":
             for sample in these_samples:
                 outfiles.append("results/peak_calling/%s/macs2/%s_peaks.broadPeak"%(model, sample))
@@ -41,7 +41,7 @@ def determine_peak_coverage_files(config, pep):
     for model in lookup_in_config(config, ["peak_calling"], []):
         if lookup_in_config(config, ["peak_calling", model, "peak_coverage"], ""):
             these_samples = filter_samples(pep, \
-            lookup_in_config(config, ["peak_calling", model, "filter"], "not input_sample.isnull()"))
+            lookup_in_config(config, ["peak_calling", model, "filter"], "input_samples != '' and input_sample.isnull()"))
             outfiles.extend(["results/peak_calling/%s/peak_coverage/%s_peak_coverage.tsv.gz"%(model, sample) for sample in these_samples])
     return outfiles
 
@@ -173,6 +173,7 @@ rule peak_coverage:
     params:
         upstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "upstream"], 0),
         downstream = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "downstream"], 0),
+        coords = lambda wildcards: lookup_in_config(config, ["peak_calling", wildcards.model, "peak_coverage", "coords"], "relative_start"),
         res = RES
     threads:
         5
@@ -186,6 +187,7 @@ rule peak_coverage:
         "--regions {input.regions} "
         "--upstream {params.upstream} "
         "--downstream {params.downstream} "
+        "--coords {params.coords} "
         "--samp_names {wildcards.sample} "
         "--summarize identity "
         "--gzip "

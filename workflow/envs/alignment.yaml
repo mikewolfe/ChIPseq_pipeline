@@ -6,4 +6,5 @@ dependencies:
     - tbb=2020.2
     - samtools=1.10
     - biopython=1.78
-    - ncbi-acc-download=0.2.6
+    - ncbi-acc-download=0.2.8
+    - picard-slim

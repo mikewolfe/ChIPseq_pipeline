@@ -95,6 +95,42 @@ coverage_and_norm:
     dropNaNsandInfs: true
     # Robust Z scale the log2ratio of extracted to input
     RobustZ: true
+    
+    # revamped spike-in normalization using a model-based approach
+
+    # summarizes values by region
+    group_norm:
+        # Can specify different "models" to run by naming them here
+        # Model 1 - look at the full coverage for all genes
+        all_samples:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            upstream: 20
+            downstream: 20
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_raw_inpcqt.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "nonspike_frag_sfs", "deseq2_sfs", "deseq2_spike_sfs", "regress_rpm_sfs"]
+
+        all_samples_no_expected:
+            metadata: "pep/test_samples.csv"
+            pseudocount: 0.1
+            spikecontigs: "U00096.3"
+            # only consider the samples that have a genotype A
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_raw_inpcqt.bw"
+            methods: ["total_frag_sfs", "spike_frag_sfs", "regress_rpm_sfs", "regress_total_rpm_sfs"]
+
+
     # Which samples should be smoothed? Smoothing currently only supported for
     # spike-in and median normalization. This smooths everything.
     # If only want inputs smoothed ('input_sample.isnull()').
@@ -136,7 +172,7 @@ coverage_and_norm:
     #   'mirror' - mirrors half the window at the edges.
     bwtools_smooth:
         param_string:
-            value: "--operation 'gauss_smooth' --wsize 50 --edge 'wrap'"
+            value: "--operation 'GLMGam_smooth' --smooth_scaler 'fractional'"
     bwtools_spike_scale:
         # This controls how the spike-in regions are used to scale the
         # data when scaling to a spike-in.
@@ -194,37 +230,75 @@ coverage_and_norm:
         # samples
         mean_genotypeA:
             # Filter for genotype A files but exclude the input samples
-            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupA: 'genotype == "A" and not input_sample.isnull() and input_sample != ""'
             # Choose the raw bigwigs as the inputs for each of these samples
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             # Choose an average calculation as the summary statistic. Other 
             # operations include max, min, and median. NaNs and Infs are ignored
             # for the summary calc
-            operation_within: "mean"
+            within_operation: "mean"
 
         # Model 2: Take the average of all genotypeA tracks and subtract the
         # average of all genotypeB tracks. 
         mean_genotypeA_minus_mean_genotypeB:
             # Filter for genotype A files but exclude the input samples
-            filter_groupA: 'genotype == "A" and not input_sample.isnull()'
+            filter_groupA: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # Filter for genotype B files but exclude the input samples
-            filter_groupB: 'genotype == "B" and not input_sample.isnull()'
+            filter_groupB: 'genotype == "B" and input_sample != "" and not input_sample.isnull()'
             # Choose the raw bigwigs as the inputs for each of these samples
             filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
             # Choose an average calculation as the summary statistic. Other 
             # operations include max, min, and median. NaNs and Infs are ignored
             # for the summary calc
-            operation_within: "mean"
+            within_operation: "mean"
             # Choose a subtraction operation for calculations between the
             # summaries of the two groups. Other operations include divide,
             # add, log2ratio, and recipratio.
-            operation_btwn: "subtract"
+            between_operation: "subtract"
+
+        mean_genotypeA_mean_genotypeB_log2ratio:
+            # Filter for genotype A files but exclude the input samples
+            filter_groupA: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
+            # Filter for genotype B files but exclude the input samples
+            filter_groupB: 'genotype == "B" and input_sample != "" and not input_sample.isnull()'
+            # Choose the raw bigwigs as the inputs for each of these samples
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Choose an average calculation as the summary statistic. Other 
+            # operations include max, min, and median. NaNs and Infs are ignored
+            # for the summary calc
+            within_operation: "mean"
+            # Choose a subtraction operation for calculations between the
+            # summaries of the two groups. Other operations include divide,
+            # add, log2ratio, and recipratio.
+            between_operation: "log2ratio"
 
 # Options to control quality control
 quality_control:
+    qc_to_run:
+        - "fastqc"
+        - "coverage"
+        - "pe_fragment"
     # what column to group samples by for ChIP-QC output plots?
     group_by: genome
-
+    # control how reads are filter for ALL samples
+    bamCoverage_params: " " 
+    # Determine sampling parameters for fingerprint plots. These are good
+    # defaults for E. coli
+    plotFingerprint:
+        binsize: 500
+        num_samps: 9200
+    # Determine bin size for coverage calcs. This controls PCA and correlation
+    # as well
+    multiBamSummary:
+        binsize: 1000
+    # Determine sampling parameters for coverage calculations
+    plotCoverage:
+        num_samps: 1000
+    bamPEFragSize:
+        bin_dist: 10000
+    frags_per_contig:
+        samtools_param_string:
+            column: "samtools_params"
 
 # Options to control peak calling
 # run with run_peak_calling
@@ -234,7 +308,7 @@ peak_calling:
         # specify the peak caller to use. Currently only support "cmarrt" and "macs2"
         peak_caller: "cmarrt"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Choose which coverage file you want to run the peak caller on
         filesignature: "results/coverage_and_norm/bwtools_compare/%s_BPM_log2ratio.bw"
         # Window size is required for cmarrt
@@ -250,7 +324,7 @@ peak_calling:
     macs2_all:
         peak_caller: "macs2"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -271,7 +345,7 @@ peak_calling:
     macs2_broad_all:
         peak_caller: "macs2_broad"
         # filter out the samples you want to run based on metadata
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Macs2 runs directly on the bam files for each sample so
         # a filesignature does not need to specified.
 
@@ -289,7 +363,7 @@ motif_calling:
         # Which motif caller? Supports meme and streme
         motif_caller: "streme"
         # Which samples to run on?
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         # Which file to run on?
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         # Parameters for the background markov model
@@ -305,7 +379,7 @@ motif_calling:
     # Same thing but running a different motif finder
     macs2_all_meme:
         motif_caller: "meme"
-        filter: 'not input_sample.isnull()'
+        filter: 'input_sample != "" and not input_sample.isnull()'
         filesignature: "results/peak_calling/macs2_all/macs2/%s_summits.bed"
         get_markov_param_string:
             value: "-dna -m 0"
@@ -317,13 +391,23 @@ variant_calling:
     # Which samples do you want to run variant calling on. Typically
     # only the input samples as specified by having no sample name in
     # the "input_sample" column
-    filter: "input_sample.isnull() or not input_sample.isnull()"
+    filter: "not sample_name.isnull()"
     # Which reference to compare against. Reference must be defined above
     # in the reference section. Can specify a single value for all samples
     # or a column in the metadata sheet to define a reference for each
     # sample
     reference:
         column: "genome"
+
+assembly:
+    filter: 'input_sample.isnull() or input_sample == "" and genotype == "A"'
+    unicycler:
+        unicycler_illumina_params: 
+            value: " "
+    quast:
+        quast_params: 
+            value: " "
+
 
 
 # Control for the postprocessing submodule
@@ -337,6 +421,7 @@ postprocessing:
             # parse it from your genbank file given the process genbank
             # parameters above in the alignment section
             regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            filter: 'input_sample != "" and not input_sample.isnull()'
             # which files to use? This file signature will substitute in
             # a sample name for the %s
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
@@ -358,11 +443,39 @@ postprocessing:
             # for summarize "identity". Try to do this on a small number of
             # samples of the same type
             calc_spearman: true
+
+        all_genes_cov_500bp_res:
+            # which regions to use? Specifying a file like this has the pipeline
+            # parse it from your genbank file given the process genbank
+            # parameters above in the alignment section
+            regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
+            filter: 'input_sample != "" and not input_sample.isnull()'
+            # which files to use? This file signature will substitute in
+            # a sample name for the %s
+            filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio.bw"
+            # how many bp upstream (5') of a feature to include
+            upstream: 0
+            # how many bp downstream (3') of a feature to include
+            downstream: 0
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # Specify how you want the coordinates to be reported in. Options
+            # include "relative_start", "relative_end", "relative_center" and
+            # "absolute". Default is "absolute"
+            coord: "absolute"
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format)
+            summarize: "identity"
+            # Change the resolution before doing calculations?
+            res_to: 500
+
         # Model 2 - look at the coverage for all genes as a mean summary
         all_genes_mean:
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use? Note we can use a different set than Model 1
+            filter: 'input_sample != "" and not input_sample.isnull()'
             filesignature: "results/coverage_and_norm/bwtools_compare/%s_median_ratio_querysub_queryscale.bw"
             # what resolution to query data (shouldn't be lower than the
             # resolution of your file, think of this as a sampling rate, no 
@@ -384,7 +497,7 @@ postprocessing:
             # only consider the samples that have a genotype A. Ensure that they
             # have an associated input sample so that the input samples
             # themselves are not run.
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -398,13 +511,14 @@ postprocessing:
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
             summary_func: "RPP"
+            bwtools_query_params: "--TR_A_center 100 "
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
         
         # Model 4 - look at the traveling ratio for samples in genotype A
         genotypeA_all_genes_TR:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -427,7 +541,7 @@ postprocessing:
         # ratio
         genotypeA_all_genes_summit_loc:
             # only consider the samples that have a genotype A
-            filter: 'genotype == "A" and not input_sample.isnull()'
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
             # which files to use?
@@ -451,6 +565,54 @@ postprocessing:
         # ratio
         genotypeA_all_genes_TR_fixed:
             # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR"
+            bwtools_query_params: "--TR_A_center 40 --TR_B_center 200"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 6 - look at the identified beta peak locations for the traveling
+        # ratio
+        genotypeA_all_genes_TR_A:
+            # only consider the samples that have a genotype A
+            filter: 'genotype == "A" and input_sample != "" and not input_sample.isnull()'
+            # which regions to use?
+            regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
+            # which files to use?
+            filesignature: "results/coverage_and_norm/deeptools_coverage/%s_raw.bw"
+            # Here we want to consider 300 bp upstream in our region as well
+            upstream: 300
+            # what resolution to query data (shouldn't be lower than the
+            # resolution of your file
+            res : 5
+            # How do you want to summarize your data? (identity gives every data
+            # point in tidy format, single allows for a single number summary)
+            summarize: "single"
+            # What single number summary do you want (mean, median, max, min)
+            # only defined when summarize is "single"
+            summary_func: "TR_A"
+            bwtools_query_params: "--TR_A_center 40 --TR_B_center 200"
+            # what fraction of NaNs can be in a region and still report a value?
+            frac_na: 0.20
+
+        # Model 6 - look at the identified beta peak locations for the traveling
+        # ratio
+        genotypeA_all_genes_TR_B:
+            # only consider the samples that have a genotype A
             filter: 'genotype == "A" and not input_sample.isnull()'
             # which regions to use?
             regions: "results/alignment/process_genbank/U00096.3/U00096.3.bed"
@@ -466,8 +628,8 @@ postprocessing:
             summarize: "single"
             # What single number summary do you want (mean, median, max, min)
             # only defined when summarize is "single"
-            summary_func: "TR_fixed"
-            bwtools_query_params: "--TR_A_center 40 "
+            summary_func: "TR_B"
+            bwtools_query_params: "--TR_A_center 40 --TR_B_center 200"
             # what fraction of NaNs can be in a region and still report a value?
             frac_na: 0.20
 
@@ -480,5 +642,3 @@ postprocessing:
             regions: "results/alignment/combine_bed/U00096.3/U00096.3.bed"
             # only consider the samples that have a genotype A.
             filter: 'genotype == "A"'
-
-
