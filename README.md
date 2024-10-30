@@ -149,7 +149,7 @@ If you run into any issues with the pipeline and would like help please submit i
 # Version history
 
 
-Currently at version 0.3.0
+Currently at version 0.4.0
 
 
 See the [Changelog](CHANGELOG.md) for version history and upcoming
