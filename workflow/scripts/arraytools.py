@@ -267,14 +267,14 @@ def relative_summit_loc(array, wsize = 50):
     peak = np.nanargmax(smoothed)
     return peak
 
-def traveling_ratio(array, wsize = 50, wA = None, wB = None, out = "ratio"):
+def traveling_ratio(array, wsize = 50, wfunc = np.nanmean, wA = None, wB = None, out = "ratio"):
     # if peak isn't specified then dynamically find it
     if wA is None:
         wA = relative_summit_loc(array, wsize)
     # peak should at the very least be in the first half of the region
     if wA >= len(array) / 2:
         return np.nan
-    wA_avg = np.nanmean(array[max(wA - wsize, 0):min(wA + wsize, len(array))])
+    wA_avg = wfunc(array[max(wA - wsize, 0):min(wA + wsize, len(array))])
 
     if wB is None: 
         # if not defined make wB halfway between the end of the array and the
@@ -286,7 +286,7 @@ def traveling_ratio(array, wsize = 50, wA = None, wB = None, out = "ratio"):
     if wB - wsize < wA + wsize or wB + wsize > len(array):
         return np.nan
 
-    wB_avg = np.nanmean(array[(wB - wsize):(wB + wsize)])
+    wB_avg = wfunc(array[(wB - wsize):(wB + wsize)])
     if out == "ratio":
         out_val = wB_avg/wA_avg
     elif out == "A":

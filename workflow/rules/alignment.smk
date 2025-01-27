@@ -180,6 +180,11 @@ rule bowtie2_map:
     shell:
         "bowtie2 -x {params.bt2_index} -p {threads} "
         "-1 {input.in1} -2 {input.in2}  "
+        "--rg-id {wildcards.sample} "
+        "--rg 'PL:illumina' "
+        "--rg 'PU:{wildcards.sample}' "
+        "--rg 'SM:{wildcards.sample}' " 
+        "--rg 'LB:{wildcards.sample}' "
         "{params.bowtie2_param_string} 2> {log.stderr} "
         "| samtools view {params.samtools_view_param_string} > {output}"
 
@@ -206,6 +211,11 @@ rule bowtie2_map_se:
     shell:
         "bowtie2 -x {params.bt2_index} -p {threads} "
         "-U {input.in1} "
+        "--rg-id {wildcards.sample} "
+        "--rg 'PL:illumina' "
+        "--rg 'PU:{wildcards.sample}' "
+        "--rg 'SM:{wildcards.sample}' " 
+        "--rg 'LB:{wildcards.sample}' "
         "{params.bowtie2_param_string} 2> {log.stderr} "
         "| samtools view {params.samtools_view_param_string} > {output}"
 
